@@ -77,8 +77,7 @@ class SubtitleOptimizer:
 
     def optimizer_multi_thread(self, subtitle_json: Dict[int, str],
                                translate=False,
-                               reflect=False,
-                               callback=None):
+                               reflect=False):
         batch_num = self.batch_num
         items = list(subtitle_json.items())[:]
         chunks = [dict(items[i:i + batch_num]) for i in range(0, len(items), batch_num)]
@@ -96,8 +95,6 @@ class SubtitleOptimizer:
                 except Exception as e:
                     logger.error(f"优化失败：{e}")
                     result = chunk
-            if callback:
-                callback(result)
             return result
 
         results = list(self.executor.map(process_chunk, chunks))

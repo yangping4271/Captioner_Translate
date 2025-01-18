@@ -1,8 +1,6 @@
 import argparse
 import os
-import sys
 import datetime
-import threading
 from pathlib import Path
 from typing import Optional, Dict, Any
 import dotenv
@@ -35,7 +33,7 @@ class SubtitleTranslator:
 
             "target_language": "简体中文",
             "temperature": 0.7,
-            "subtitle_layout": "译文在上",
+            "subtitle_layout": "仅译文",
             "thread_num": 10,
             "batch_size": 20,
             "max_word_count_cjk": 18,
@@ -44,9 +42,7 @@ class SubtitleTranslator:
             "faster_whisper_one_word": True
         }
 
-    def translate(self, input_file: str, output_file: str,
-                 optimize: bool = True, translate: bool = True,
-                 layout: Optional[str] = None) -> None:
+    def translate(self, input_file: str, output_file: str) -> None:
         try:
             logger.info(f"\n===========字幕优化任务开始===========")
             logger.info(f"时间：{datetime.datetime.now()}")
@@ -92,44 +88,34 @@ class SubtitleTranslator:
             subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
             self.subtitle_length = len(subtitle_json)
 
-            if translate or optimize:
-                summarize_result = self.custom_prompt_text.strip()
-                logger.info("总结字幕...")
-                if not summarize_result:
-                    summarizer = SubtitleSummarizer(model=llm_model)
-                    summarize_result = summarizer.summarize(asr_data.to_txt())
+            summarize_result = self.custom_prompt_text.strip()
+            logger.info("总结字幕...")
+            if not summarize_result:
+                summarizer = SubtitleSummarizer(model=llm_model)
+                summarize_result = summarizer.summarize(asr_data.to_txt())
                 logger.info(f"总结字幕内容:{summarize_result}")
                 
-                if translate:
-                    logger.info("正在优化+翻译...")
-                    need_reflect = False
-                    optimizer = SubtitleOptimizer(
-                        summary_content=summarize_result,
-                        model=llm_model,
-                        target_language=self.config["target_language"],
-                        batch_num=self.config["batch_size"],
-                        thread_num=self.config["thread_num"],
-                        llm_result_logger=self.llm_result_logger,
-                        need_remove_punctuation=False,
-                        cjk_only=True
-                    )
-                    optimizer_result = optimizer.optimizer_multi_thread(subtitle_json, translate=True,
-                                                                     reflect=need_reflect,
-                                                                     callback=self.callback)
-                elif optimize:
-                    logger.info("正在优化字幕...")
-                    optimizer = SubtitleOptimizer(summary_content=summarize_result, model=llm_model,
-                                               batch_num=self.config["batch_size"], thread_num=self.config["thread_num"],
-                                               llm_result_logger=self.llm_result_logger)
-                    optimizer_result = optimizer.optimizer_multi_thread(subtitle_json, callback=self.callback)
+            logger.info("正在优化+翻译...")
+            need_reflect = False
+            optimizer = SubtitleOptimizer(
+                summary_content=summarize_result,
+                model=llm_model,
+                target_language=self.config["target_language"],
+                batch_num=self.config["batch_size"],
+                thread_num=self.config["thread_num"],
+                need_remove_punctuation=False,
+                cjk_only=True
+            )
+            optimizer_result = optimizer.optimizer_multi_thread(subtitle_json, translate=True,
+                                                                 reflect=need_reflect)
 
-                # 替换优化或者翻译后的字幕
-                for i, subtitle_text in optimizer_result.items():
-                    seg = asr_data.segments[int(i) - 1]
-                    seg.text = subtitle_text
+            # 替换优化或者翻译后的字幕
+            for i, subtitle_text in optimizer_result.items():
+                seg = asr_data.segments[int(i) - 1]
+                seg.text = subtitle_text
 
             # 保存字幕
-            subtitle_layout = layout or self.config["subtitle_layout"]
+            subtitle_layout = self.config["subtitle_layout"]
             if output_file.endswith(".ass"):
                 asr_data.to_ass(style_str=None, layout=subtitle_layout, save_path=output_file)
             else:
@@ -144,43 +130,24 @@ class SubtitleTranslator:
             logger.exception(f"优化失败: {str(e)}")
             raise
 
-    def callback(self, result: Dict):
-        self.finished_subtitle_length += len(result)
-        progress = int((self.finished_subtitle_length / self.subtitle_length) * 100)
-        logger.info(f"{progress}% 处理字幕")
 
 def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
     parser.add_argument('input', help='输入字幕文件路径')
-    parser.add_argument('output', nargs='?', help='输出字幕文件路径')
-    parser.add_argument('--no-optimize', action='store_true', help='禁用字幕优化')
-    parser.add_argument('--no-translate', action='store_true', help='禁用字幕翻译')
-    parser.add_argument('--layout', choices=['原文在上', '译文在上', '仅原文', '仅译文'],
-                      help='字幕布局方式')
-    parser.add_argument('-m', '--model', type=str, help="指定使用的语言模型")
     args = parser.parse_args()
+    input_file = args.input
+    output_file = input_file.replace('.srt', '_zh.srt')
     
-    if not args.output:
-        args.output = args.input.replace('.srt', '_zh.srt')
-    
-    if not os.path.exists(args.input):
-        print(f"错误: 输入文件 {args.input} 不存在")
+    if not os.path.exists(input_file):
+        print(f"错误: 输入文件 {input_file} 不存在")
         return
-
-    output_dir = os.path.dirname(args.output)
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
     try:
         translator = SubtitleTranslator()
-        translator.config['llm_model'] = args.model if args.model else translator.config['llm_model']
-        print(f"\n-----------------正在翻译 {args.input} 到 {args.output}-----------------")
+        print(f"\n-----------------正在翻译 {input_file} -----------------")
         translator.translate(
-            input_file=args.input,
-            output_file=args.output,
-            optimize=not args.no_optimize,
-            translate=not args.no_translate,
-            layout=args.layout
+            input_file=input_file,
+            output_file=output_file
         )
     except Exception as e:
         print(f"发生错误: {str(e)}")

@@ -25,3 +25,6 @@
 
 # 虚拟环境
 venv/
+
+# DS_Store
+.DS_Store

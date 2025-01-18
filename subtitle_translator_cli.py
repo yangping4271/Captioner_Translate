@@ -9,14 +9,10 @@ import dotenv
 
 dotenv.load_dotenv()
 
-# 添加项目根目录到 Python 路径
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_root)
-
 from app.core.subtitle_processor.optimizer import SubtitleOptimizer
 from app.core.subtitle_processor.summarizer import SubtitleSummarizer
-from app.core.bk_asr.ASRData import from_subtitle_file
 from app.core.subtitle_processor.spliter import merge_segments
+from app.core.bk_asr.ASRData import from_subtitle_file
 from app.core.utils.test_opanai import test_openai
 from app.core.utils.logger import setup_logger
 

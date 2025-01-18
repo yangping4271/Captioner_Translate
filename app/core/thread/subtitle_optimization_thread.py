@@ -13,7 +13,6 @@ from ..entities import Task
 from ..subtitle_processor.spliter import merge_segments
 from ..utils.test_opanai import test_openai
 from ..utils.logger import setup_logger
-from ...common.config import cfg
 
 # 配置日志
 logger = setup_logger("subtitle_optimization_thread")
@@ -98,7 +97,7 @@ class SubtitleOptimizationThread(QThread):
             max_word_count_cjk = self.task.max_word_count_cjk
             max_word_count_english = self.task.max_word_count_english
             need_split=self.task.need_split
-            need_remove_punctuation = cfg.needs_remove_punctuation.value
+            need_remove_punctuation = False
 
             # 断句文件保存路径
             split_path = self.task.file_path.replace('.srt', '_en.srt')

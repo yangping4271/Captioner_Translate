@@ -15,7 +15,7 @@ SEGMENT_THRESHOLD = 500  # 每个分段的最大字数
 FIXED_NUM_THREADS = 1  # 固定的线程数量
 SPLIT_RANGE = 30  # 在分割点前后寻找最大时间间隔的范围
 MAX_GAP = 1500  # 允许每个词语之间的最大时间间隔 ms
-USE_CACHE = True  # 是否使用缓存
+USE_CACHE = False  # 是否使用缓存
 
 MAX_WORD_COUNT_ENGLISH = 15  # 英文最大单词数
 MAX_WORD_COUNT_CJK = 20     # 中日韩文字最大字数

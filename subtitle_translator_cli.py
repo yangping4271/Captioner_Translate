@@ -30,13 +30,12 @@ class SubtitleTranslator:
             "api_key": os.getenv('OPENAI_API_KEY'),
             "api_base": os.getenv('OPENAI_BASE_URL'),
 
-            "target_language": TargetLanguageEnum.CHINESE_SIMPLIFIED,
+            "target_language": TargetLanguageEnum.CHINESE_SIMPLIFIED.value,
             "temperature": 0.7,
-            "subtitle_layout": SubtitleLayoutEnum.ONLY_TRANSLATE,
+            "subtitle_layout": SubtitleLayoutEnum.ONLY_TRANSLATE.value,
             "thread_num": 10,
             "batch_size": 20
         }
-
         if config_path and os.path.exists(config_path):
             with open(config_path, 'r', encoding='utf-8') as f:
                 user_config = json.load(f)

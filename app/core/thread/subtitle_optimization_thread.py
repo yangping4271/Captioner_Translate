@@ -98,9 +98,7 @@ class SubtitleOptimizationThread(QThread):
             max_word_count_cjk = self.task.max_word_count_cjk
             max_word_count_english = self.task.max_word_count_english
             need_split=self.task.need_split
-            split_path = str(Path(result_subtitle_save_path).parent / f"【智能断句】{Path(str_path).stem}.srt")
             need_remove_punctuation = cfg.needs_remove_punctuation.value
-
 
             # 断句文件保存路径
             split_path = self.task.file_path.replace('.srt', '_en.srt')
@@ -129,7 +127,6 @@ class SubtitleOptimizationThread(QThread):
                                           num_threads=thread_num, 
                                           max_word_count_cjk=max_word_count_cjk, 
                                           max_word_count_english=max_word_count_english)
-                logger.info(f"保存断句文件到 {split_path}")
                 asr_data.save(save_path=split_path)
                 self.update_all.emit(asr_data.to_json())
 
@@ -179,7 +176,8 @@ class SubtitleOptimizationThread(QThread):
                 else:
                     asr_data.save(save_path=result_subtitle_save_path, ass_style=subtitle_style_srt,
                                   layout=subtitle_layout)
-                logger.info(f"字幕优化完成，保存到 {result_subtitle_save_path}")
+                if not os.path.exists(result_subtitle_save_path):
+                    raise Exception(f"字幕优化失败...")
             else:
                 if result_subtitle_save_path.endswith(".ass"):
                     asr_data.to_ass(subtitle_style_srt, subtitle_layout, result_subtitle_save_path)

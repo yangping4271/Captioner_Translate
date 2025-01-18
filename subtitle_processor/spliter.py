@@ -5,9 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from retry import retry
 
-from .split_by_llm import split_by_llm
-from ..bk_asr.ASRData import ASRData, from_srt, ASRDataSeg
-from ..utils.logger import setup_logger
+from subtitle_processor.split_by_llm import split_by_llm
+from bk_asr.ASRData import ASRData, from_srt, ASRDataSeg
+from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_spliter")
 

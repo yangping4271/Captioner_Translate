@@ -3,12 +3,12 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-from app.core.subtitle_processor.optimizer import SubtitleOptimizer
-from app.core.subtitle_processor.summarizer import SubtitleSummarizer
-from app.core.subtitle_processor.spliter import merge_segments
-from app.core.bk_asr.ASRData import from_subtitle_file
-from app.core.utils.test_opanai import test_openai
-from app.core.utils.logger import setup_logger
+from subtitle_processor.optimizer import SubtitleOptimizer
+from subtitle_processor.summarizer import SubtitleSummarizer
+from subtitle_processor.spliter import merge_segments
+from bk_asr.ASRData import from_subtitle_file
+from utils.test_opanai import test_openai
+from utils.logger import setup_logger
 
 import dotenv
 dotenv.load_dotenv()

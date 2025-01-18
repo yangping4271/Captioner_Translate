@@ -2,9 +2,9 @@ import os
 
 from openai import OpenAI
 
-from .subtitle_config import SUMMARIZER_PROMPT
-from ..utils import json_repair
-from ..utils.logger import setup_logger
+from subtitle_processor.subtitle_config import SUMMARIZER_PROMPT
+from utils import json_repair
+from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_summarizer")
 

@@ -4,8 +4,8 @@ from typing import List
 import openai
 import retry
 
-from .subtitle_config import SPLIT_SYSTEM_PROMPT
-from ..utils.logger import setup_logger
+from subtitle_processor.subtitle_config import SPLIT_SYSTEM_PROMPT
+from utils.logger import setup_logger
 
 logger = setup_logger("split_by_llm")
 

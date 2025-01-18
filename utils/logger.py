@@ -3,7 +3,7 @@ import logging.handlers
 from pathlib import Path
 
 # 路径
-ROOT_PATH = Path(__file__).parent.parent.parent.parent
+ROOT_PATH = Path(__file__).parent.parent
 LOG_PATH = ROOT_PATH / "logs"
 
 # 日志配置

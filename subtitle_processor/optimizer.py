@@ -14,9 +14,9 @@ from .subtitle_config import (
     REFLECT_TRANSLATE_PROMPT,
     SINGLE_TRANSLATE_PROMPT
 )
-from ..subtitle_processor.aligner import SubtitleAligner
-from ..utils import json_repair
-from ..utils.logger import setup_logger
+from subtitle_processor.aligner import SubtitleAligner
+from utils import json_repair
+from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_optimizer")
 

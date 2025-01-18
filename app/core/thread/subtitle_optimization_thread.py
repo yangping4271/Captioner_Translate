@@ -101,6 +101,10 @@ class SubtitleOptimizationThread(QThread):
             split_path = str(Path(result_subtitle_save_path).parent / f"【智能断句】{Path(str_path).stem}.srt")
             need_remove_punctuation = cfg.needs_remove_punctuation.value
 
+
+            # 断句文件保存路径
+            split_path = self.task.file_path.replace('.srt', '_en.srt')
+
             # 检查
             assert str_path is not None, self.tr("字幕文件路径为空")
             assert Path(str_path).exists(), self.tr("字幕文件路径不存在")
@@ -125,6 +129,7 @@ class SubtitleOptimizationThread(QThread):
                                           num_threads=thread_num, 
                                           max_word_count_cjk=max_word_count_cjk, 
                                           max_word_count_english=max_word_count_english)
+                logger.info(f"保存断句文件到 {split_path}")
                 asr_data.save(save_path=split_path)
                 self.update_all.emit(asr_data.to_json())
 
@@ -184,8 +189,8 @@ class SubtitleOptimizationThread(QThread):
                 logger.info(f"无需优化翻译，直接保存 {result_subtitle_save_path}")
 
             # 删除断句文件
-            if os.path.exists(split_path):
-                os.remove(split_path)
+            # if os.path.exists(split_path):
+            #     os.remove(split_path)
             # 保存srt文件
             if self.task.video_info:
                 save_srt_path = Path(self.task.work_dir) / f"【卡卡】{Path(self.task.video_info.file_name).stem}.srt"

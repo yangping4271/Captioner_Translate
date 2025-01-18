@@ -1,11 +1,7 @@
 import argparse
 import os
-import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
-import dotenv
-
-dotenv.load_dotenv()
+from typing import Dict, Any
 
 from app.core.subtitle_processor.optimizer import SubtitleOptimizer
 from app.core.subtitle_processor.summarizer import SubtitleSummarizer
@@ -14,8 +10,11 @@ from app.core.bk_asr.ASRData import from_subtitle_file
 from app.core.utils.test_opanai import test_openai
 from app.core.utils.logger import setup_logger
 
+import dotenv
+dotenv.load_dotenv()
+
 # 配置日志
-logger = setup_logger("subtitle_translator_cli")
+logger = setup_logger("subtitle_translator_cli", log_fmt='%(asctime)s - %(message)s')
 
 class SubtitleTranslator:
     def __init__(self):
@@ -30,22 +29,17 @@ class SubtitleTranslator:
             "llm_model": os.getenv('LLM_MODEL'),
             "api_key": os.getenv('OPENAI_API_KEY'),
             "api_base": os.getenv('OPENAI_BASE_URL'),
-
             "target_language": "简体中文",
-            "temperature": 0.7,
             "subtitle_layout": "仅译文",
             "thread_num": 10,
             "batch_size": 20,
             "max_word_count_cjk": 18,
             "max_word_count_english": 12,
-            "need_split": True,
-            "faster_whisper_one_word": True
         }
 
     def translate(self, input_file: str, output_file: str) -> None:
         try:
             logger.info(f"\n===========字幕优化任务开始===========")
-            logger.info(f"时间：{datetime.datetime.now()}")
             
             # 获取API配置
             llm_model = self.config["llm_model"]
@@ -70,7 +64,7 @@ class SubtitleTranslator:
 
             # 检查是否需要合并重新断句
             split_path = input_file.replace('.srt', '_en.srt')
-            if not asr_data.is_word_timestamp() and self.config["need_split"] and self.config["faster_whisper_one_word"]:
+            if not asr_data.is_word_timestamp():
                 asr_data.split_to_word_segments()
             if asr_data.is_word_timestamp():
                 logger.info("正在字幕断句...")

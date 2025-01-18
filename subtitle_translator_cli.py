@@ -39,8 +39,7 @@ class SubtitleTranslator:
 
     def translate(self, input_file: str, output_file: str) -> None:
         try:
-            logger.info(f"\n===========字幕优化任务开始===========")
-            
+            logger.info("字幕优化任务开始...")     
             # 获取API配置
             llm_model = self.config["llm_model"]
             api_base = self.config["api_base"]
@@ -138,7 +137,7 @@ def main():
 
     try:
         translator = SubtitleTranslator()
-        logger.info(f"\n-----------------正在翻译 {input_file} -----------------")
+        print(f"\n=================== 正在翻译 {input_file} ===================\n")
         translator.translate(
             input_file=input_file,
             output_file=output_file

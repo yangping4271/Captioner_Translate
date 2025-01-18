@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from retry import retry
 
-from .split_by_llm import split_by_llm, MAX_WORD_COUNT
+from .split_by_llm import split_by_llm
 from ..bk_asr.ASRData import ASRData, from_srt, ASRDataSeg
 from ..utils.logger import setup_logger
 
@@ -17,7 +17,7 @@ SPLIT_RANGE = 30  # 在分割点前后寻找最大时间间隔的范围
 MAX_GAP = 1500  # 允许每个词语之间的最大时间间隔 ms
 USE_CACHE = True  # 是否使用缓存
 
-MAX_WORD_COUNT_ENGLISH = 12  # 英文最大单词数
+MAX_WORD_COUNT_ENGLISH = 15  # 英文最大单词数
 MAX_WORD_COUNT_CJK = 20     # 中日韩文字最大字数
 
 class SubtitleProcessError(Exception):
@@ -341,7 +341,7 @@ def merge_short_segment(segments: List[ASRDataSeg]) -> None:
         total_words = current_words + next_words
         max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(current_seg.text) else MAX_WORD_COUNT_ENGLISH
 
-        if time_gap < 300 and (current_words < 5 or next_words <= 5) and total_words <= max_word_count:
+        if time_gap < 300 and (current_words < 5 or next_words <= 5) and total_words <= max_word_count and "." not in current_seg.text:
             # 执行合并操作
             logger.debug(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {time_gap}")
             

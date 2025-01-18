@@ -16,7 +16,8 @@ dotenv.load_dotenv()
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-from app.core.entities import Task
+from app.core.entities import Task, TargetLanguageEnum
+from app.common.config import SubtitleLayoutEnum
 from app.core.thread.subtitle_optimization_thread import SubtitleOptimizationThread
 
 class SubtitleTranslator:
@@ -29,9 +30,9 @@ class SubtitleTranslator:
             "api_key": os.getenv('OPENAI_API_KEY'),
             "api_base": os.getenv('OPENAI_BASE_URL'),
 
-            "target_language": "中文",
+            "target_language": TargetLanguageEnum.SimplifiedChinese,
             "temperature": 0.7,
-            "subtitle_layout": "仅译文",
+            "subtitle_layout": SubtitleLayoutEnum.ONLY_TRANSLATE,
             "thread_num": 10,
             "batch_size": 20
         }

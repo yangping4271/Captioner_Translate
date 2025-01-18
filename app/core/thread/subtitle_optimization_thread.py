@@ -110,10 +110,10 @@ class SubtitleOptimizationThread(QThread):
 
             self.progress.emit(2, self.tr("开始优化字幕..."))
 
-            self.llm_result_logger = setup_logger("llm_result", 
-                                                info_fmt="%(message)s",
-                                                log_file=str(Path(str_path).parent / '优化日志.log'),
-                                                console_output=False)
+            # self.llm_result_logger = setup_logger("llm_result", 
+                                                # info_fmt="%(message)s",
+                                                # log_file=str(Path(str_path).parent / '优化日志.log'),
+                                                # console_output=False)
 
             asr_data = from_subtitle_file(str_path)
 
@@ -144,7 +144,8 @@ class SubtitleOptimizationThread(QThread):
                 if need_translate:
                     self.progress.emit(30, self.tr("优化+翻译..."))
                     logger.info("正在优化+翻译...")
-                    need_reflect = False if "glm-4-flash" in llm_model.lower() else True
+                    # need_reflect = False if "glm-4-flash" in llm_model.lower() else True
+                    need_reflect = False
                     self.optimizer = SubtitleOptimizer(
                         summary_content=summarize_result,
                         model=llm_model,

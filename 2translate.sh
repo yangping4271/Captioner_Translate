@@ -65,7 +65,7 @@ for file in $files; do
 done
 
 # 硬删除srt字幕
-# rm -rf *.srt_
+rm -rf *.srt_
 
 echo 'Deactivating virtual environment...'
 deactivate

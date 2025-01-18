@@ -1,8 +1,4 @@
-﻿requests
-openai
+﻿openai
 retry
-PyQt5
-PyQt-Fluent-Widgets
-yt_dlp
-modelscope
 python-dotenv
+requests

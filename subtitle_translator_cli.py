@@ -30,7 +30,7 @@ class SubtitleTranslator:
             "api_key": os.getenv('OPENAI_API_KEY'),
             "api_base": os.getenv('OPENAI_BASE_URL'),
 
-            "target_language": TargetLanguageEnum.SimplifiedChinese,
+            "target_language": TargetLanguageEnum.CHINESE_SIMPLIFIED,
             "temperature": 0.7,
             "subtitle_layout": SubtitleLayoutEnum.ONLY_TRANSLATE,
             "thread_num": 10,

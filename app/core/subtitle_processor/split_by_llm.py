@@ -13,7 +13,7 @@ from ..utils.logger import setup_logger
 
 logger = setup_logger("split_by_llm")
 
-MAX_WORD_COUNT = 20  # 英文单词或中文字符的最大数量
+MAX_WORD_COUNT = 15  # 英文单词或中文字符的最大数量
 
 
 def count_words(text: str) -> int:
@@ -95,7 +95,8 @@ def split_by_llm_retry(text: str,
         if cached_result:
             logger.info(f"从缓存中获取断句结果")
             return cached_result
-    logger.info(f"未命中缓存，开始断句")
+        else:
+            logger.info(f"未命中缓存，开始断句")
     # 初始化OpenAI客户端
     client = openai.OpenAI()
     response = client.chat.completions.create(
@@ -117,7 +118,8 @@ def split_by_llm_retry(text: str,
     br_count = len(split_result)
     if br_count < count_words(text) / MAX_WORD_COUNT * 0.9:
         raise Exception("断句失败")
-    set_cache(system_prompt+user_prompt, model, split_result)
+    if use_cache:
+        set_cache(system_prompt+user_prompt, model, split_result)
     return split_result
 
 

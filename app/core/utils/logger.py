@@ -4,8 +4,13 @@ from pathlib import Path
 
 from urllib3.exceptions import InsecureRequestWarning
 
-from ...config import LOG_PATH, LOG_LEVEL
+# 路径
+ROOT_PATH = Path(__file__).parent.parent.parent.parent
+LOG_PATH = ROOT_PATH / "logs"
 
+# 日志配置
+LOG_LEVEL = logging.INFO
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
 def setup_logger(name: str, 

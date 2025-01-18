@@ -23,6 +23,9 @@
 /output/
 /work-dir/
 
+# 日志
+logs/
+
 # 虚拟环境
 venv/
 

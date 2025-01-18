@@ -537,10 +537,10 @@ def process_by_rules(segments: List[ASRDataSeg]) -> List[ASRDataSeg]:
     Returns:
         处理后的分段列表
     """
-    print(f"分段: {len(segments)}")
+    logger.info(f"分段: {len(segments)}")
     # 1. 先按时间间隔分组
     segment_groups = merge_by_time_gaps(segments, max_gap=500, check_large_gaps=True)
-    print(f"按时间间隔分组分组: {len(segment_groups)}")
+    logger.info(f"按时间间隔分组分组: {len(segment_groups)}")
 
     # ====接下来遍历每个分组====
     # 2. 按常用词分割, 只处理长句

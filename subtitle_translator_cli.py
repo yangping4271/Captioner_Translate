@@ -14,7 +14,7 @@ import dotenv
 dotenv.load_dotenv()
 
 # 配置日志
-logger = setup_logger("subtitle_translator_cli", log_fmt='%(asctime)s - %(message)s')
+logger = setup_logger("subtitle_translator_cli")
 
 class SubtitleTranslator:
     def __init__(self):
@@ -119,7 +119,7 @@ class SubtitleTranslator:
                 raise Exception("字幕优化失败...")
 
             logger.info("优化完成")
-            print(f"处理完成! 文件已保存至: {output_file}")
+            logger.info(f"处理完成! 文件已保存至: {output_file}")
         except Exception as e:
             logger.exception(f"优化失败: {str(e)}")
             raise
@@ -133,18 +133,18 @@ def main():
     output_file = input_file.replace('.srt', '_zh.srt')
     
     if not os.path.exists(input_file):
-        print(f"错误: 输入文件 {input_file} 不存在")
+        logger.error(f"错误: 输入文件 {input_file} 不存在")
         return
 
     try:
         translator = SubtitleTranslator()
-        print(f"\n-----------------正在翻译 {input_file} -----------------")
+        logger.info(f"\n-----------------正在翻译 {input_file} -----------------")
         translator.translate(
             input_file=input_file,
             output_file=output_file
         )
     except Exception as e:
-        print(f"发生错误: {str(e)}")
+        logger.exception(f"发生错误: {str(e)}")
 
 if __name__ == "__main__":
     main()

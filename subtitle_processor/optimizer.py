@@ -63,7 +63,7 @@ class SubtitleOptimizer:
     def stop(self):
         """关闭线程池"""
         if hasattr(self, 'executor') and hasattr(self.executor, '_threads'):
-            print("正在强制关闭线程池")
+            logger.info("正在强制关闭线程池")
             for future in self.executor._threads:
                 try:
                     future._tstate_lock.release()

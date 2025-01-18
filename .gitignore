@@ -22,3 +22,6 @@
 /AppData/
 /output/
 /work-dir/
+
+# 虚拟环境
+venv/

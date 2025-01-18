@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-# subtitle_translator.py
-
 import argparse
-import json
 import os
 import sys
 import datetime
@@ -27,33 +23,16 @@ from app.core.utils.logger import setup_logger
 # 配置日志
 logger = setup_logger("subtitle_translator_cli")
 
-FREE_API_CONFIGS = {
-    "ddg": {
-        "base_url": "http://ddg.bkfeng.top/v1",
-        "api_key": "Hey-man-This-free-server-is-convenient-for-beginners-Please-do-not-use-for-personal-use-Server-just-has-limited-concurrency",
-        "llm_model": "gpt-4o-mini",
-        "thread_num": 5,
-        "batch_size": 10
-    },
-    "zhipu": {
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "api_key": "c96c2f6ce767136cdddc3fef1692c1de.H27sLU4GwuUVqPn5",
-        "llm_model": "glm-4-flash",
-        "thread_num": 10,
-        "batch_size": 10
-    }
-}
-
 class SubtitleTranslator:
-    def __init__(self, config_path: Optional[str] = None):
-        self.config = self._load_config(config_path)
+    def __init__(self):
+        self.config = self._load_config()
         self.subtitle_length = 0
         self.finished_subtitle_length = 0
         self.custom_prompt_text = ""
         self.llm_result_logger = None
 
-    def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
-        default_config = {
+    def _load_config(self) -> Dict[str, Any]:
+        return {
             "llm_model": os.getenv('LLM_MODEL'),
             "api_key": os.getenv('OPENAI_API_KEY'),
             "api_base": os.getenv('OPENAI_BASE_URL'),
@@ -69,31 +48,6 @@ class SubtitleTranslator:
             "faster_whisper_one_word": True
         }
 
-        if config_path and os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                user_config = json.load(f)
-                default_config.update(user_config)
-
-        return default_config
-
-    def _setup_api_config(self):
-        """设置API配置，返回base_url, api_key, llm_model, thread_num, batch_size"""
-        if self.config["api_base"] and self.config["api_key"]:
-            if not test_openai(self.config["api_base"], self.config["api_key"], self.config["llm_model"])[0]:
-                raise Exception("OpenAI API 测试失败, 请检查设置")
-            return (self.config["api_base"], self.config["api_key"], self.config["llm_model"],
-                   self.config["thread_num"], self.config["batch_size"])
-        
-        logger.info("尝试使用自带的API配置")
-        # 遍历配置字典找到第一个可用的API
-        for config in FREE_API_CONFIGS.values():
-            if test_openai(config["base_url"], config["api_key"], config["llm_model"])[0]:
-                return (config["base_url"], config["api_key"], config["llm_model"],
-                       config["thread_num"], config["batch_size"])
-        
-        logger.error("自带的API配置暂时不可用，请配置自己的API")
-        raise Exception("自带的API配置暂时不可用，请配置自己的大模型API")
-
     def translate(self, input_file: str, output_file: str,
                  optimize: bool = True, translate: bool = True,
                  layout: Optional[str] = None) -> None:
@@ -102,10 +56,15 @@ class SubtitleTranslator:
             logger.info(f"时间：{datetime.datetime.now()}")
             
             # 获取API配置
-            logger.info("开始验证API配置...")
-            base_url, api_key, llm_model, thread_num, batch_size = self._setup_api_config()
+            llm_model = self.config["llm_model"]
+            api_base = self.config["api_base"]
+            api_key = self.config["api_key"]
+            
+            if not test_openai(api_base, api_key, llm_model):
+                raise Exception("OpenAI API 测试失败, 请检查设置")
+
             logger.info(f"使用 {llm_model} 作为LLM模型")
-            os.environ['OPENAI_BASE_URL'] = base_url
+            os.environ['OPENAI_BASE_URL'] = api_base
             os.environ['OPENAI_API_KEY'] = api_key
 
             # 检查文件
@@ -124,10 +83,14 @@ class SubtitleTranslator:
             if asr_data.is_word_timestamp():
                 logger.info("正在字幕断句...")
                 asr_data = merge_segments(asr_data, model=llm_model, 
-                                       num_threads=thread_num, 
+                                       num_threads=self.config["thread_num"], 
                                        max_word_count_cjk=self.config["max_word_count_cjk"], 
                                        max_word_count_english=self.config["max_word_count_english"])
                 asr_data.save(save_path=split_path)
+                if os.path.exists(split_path):
+                    logger.info(f"字幕断句完成，已保存至: {split_path}")
+                else:
+                    raise Exception("字幕断句失败...")
 
             # 制作成请求llm接口的格式 {{"1": "original_subtitle"},...}
             subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
@@ -148,8 +111,8 @@ class SubtitleTranslator:
                         summary_content=summarize_result,
                         model=llm_model,
                         target_language=self.config["target_language"],
-                        batch_num=batch_size,
-                        thread_num=thread_num,
+                        batch_num=self.config["batch_size"],
+                        thread_num=self.config["thread_num"],
                         llm_result_logger=self.llm_result_logger,
                         need_remove_punctuation=False,
                         cjk_only=True
@@ -160,7 +123,7 @@ class SubtitleTranslator:
                 elif optimize:
                     logger.info("正在优化字幕...")
                     optimizer = SubtitleOptimizer(summary_content=summarize_result, model=llm_model,
-                                               batch_num=batch_size, thread_num=thread_num,
+                                               batch_num=self.config["batch_size"], thread_num=self.config["thread_num"],
                                                llm_result_logger=self.llm_result_logger)
                     optimizer_result = optimizer.optimizer_multi_thread(subtitle_json, callback=self.callback)
 
@@ -194,7 +157,6 @@ def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
     parser.add_argument('input', help='输入字幕文件路径')
     parser.add_argument('output', nargs='?', help='输出字幕文件路径')
-    parser.add_argument('--config', help='配置文件路径')
     parser.add_argument('--no-optimize', action='store_true', help='禁用字幕优化')
     parser.add_argument('--no-translate', action='store_true', help='禁用字幕翻译')
     parser.add_argument('--layout', choices=['原文在上', '译文在上', '仅原文', '仅译文'],
@@ -214,7 +176,7 @@ def main():
         os.makedirs(output_dir)
 
     try:
-        translator = SubtitleTranslator(args.config)
+        translator = SubtitleTranslator()
         translator.config['llm_model'] = args.model if args.model else translator.config['llm_model']
         print(f"\n-----------------正在翻译 {args.input} 到 {args.output}-----------------")
         translator.translate(

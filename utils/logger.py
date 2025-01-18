@@ -11,7 +11,7 @@ LOG_LEVEL = logging.INFO
 
 def setup_logger(name: str, 
                 level: int = LOG_LEVEL,
-                log_fmt: str = '%(asctime)s - %(message)s',
+                log_fmt: str = '%(asctime)s [%(name)s] %(levelname)s: %(message)s',
                 datefmt: str = '%Y-%m-%d %H:%M:%S',
                 log_file: str = str(LOG_PATH / 'app.log')) -> logging.Logger:
     """

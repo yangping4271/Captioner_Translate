@@ -4,6 +4,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 import re
 from typing import Dict
+import concurrent.futures
 
 import retry
 from openai import OpenAI
@@ -61,19 +62,16 @@ class SubtitleOptimizer:
         atexit.register(self.stop)
 
     def stop(self):
-        """关闭线程池"""
-        if hasattr(self, 'executor') and hasattr(self.executor, '_threads'):
-            logger.info("正在强制关闭线程池")
-            for future in self.executor._threads:
-                try:
-                    future._tstate_lock.release()
-                    future._stop()
-                except Exception:
-                    pass
-            #  关闭线程池
-            self.executor.shutdown(wait=False, cancel_futures=True)
-            self.executor = None
-
+        """优雅关闭线程池"""
+        if hasattr(self, 'executor'):
+            try:
+                logger.info("正在等待线程池任务完成...")
+                self.executor.shutdown(wait=True)
+                logger.info("线程池已关闭")
+            except Exception as e:
+                logger.error(f"关闭线程池时发生错误: {e}")
+            finally:
+                self.executor = None
 
     def optimizer_multi_thread(self, subtitle_json: Dict[int, str],
                                translate=False,
@@ -97,11 +95,35 @@ class SubtitleOptimizer:
                     result = chunk
             return result
 
-        results = list(self.executor.map(process_chunk, chunks))
+        try:
+            # 设置超时时间（秒）
+            timeout = 300  # 5分钟
+            results = []
+            
+            # 使用map并设置超时
+            future_to_chunk = {self.executor.submit(process_chunk, chunk): chunk for chunk in chunks}
+            for future in concurrent.futures.as_completed(future_to_chunk, timeout=timeout):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except concurrent.futures.TimeoutError:
+                    logger.error(f"处理超时")
+                    continue
+                except Exception as e:
+                    logger.error(f"处理失败: {e}")
+                    continue
 
-        # 合并结果
-        optimizer_result = {k: v for result in results for k, v in result.items()}
-        return optimizer_result
+            # 合并结果
+            optimizer_result = {k: v for result in results for k, v in result.items()}
+            return optimizer_result
+        except Exception as e:
+            logger.error(f"多线程处理失败: {e}")
+            # 如果多线程处理失败，尝试单线程处理
+            optimizer_result = {}
+            for chunk in chunks:
+                result = process_chunk(chunk)
+                optimizer_result.update(result)
+            return optimizer_result
     
     @retry.retry(tries=2)
     def optimize(self, original_subtitle: Dict[int, str]) -> Dict[int, str]:

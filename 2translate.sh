@@ -33,19 +33,11 @@ for file in $files; do
         mv "./${file}_en.srt" "./${file}.srt"
         python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
         # 如果断句生成srt，则重命名为en.srt，恢复原来的srt文件
-        if [ -f "./${file}.srt" ]; then
-            mv "./${file}.srt" "./${file}_en.srt"
+        if [ -f "./${file}_original.srt" ]; then
             mv "./${file}_original.srt" "./${file}.srt"
         fi
     else
         python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
-        # 如果断句生成en，则重命名原来的srt文件
-        if [ -f "./${file}_en.srt" ]; then
-            mv "./${file}.srt" "./${file}.srt"
-        # 没有断句生成en，则重命名原来的srt文件，为${file}_en.srt
-        else
-            mv "./${file}.srt" "./${file}_en.srt"
-        fi
     fi
 
     # 生成ass字幕文件

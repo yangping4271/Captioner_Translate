@@ -118,7 +118,9 @@ class SubtitleTranslator:
                 raise Exception("字幕优化失败...")
 
             logger.info("优化完成")
-            logger.info(f"处理完成! 文件已保存至: {output_file}")
+            if os.path.exists(output_file):
+                logger.info(f"处理完成! 文件已保存至: {output_file}")
+                
         except Exception as e:
             logger.exception(f"优化失败: {str(e)}")
             raise

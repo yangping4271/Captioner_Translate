@@ -37,11 +37,11 @@ class SubtitleTranslator:
             "max_word_count_english": 12,
         }
 
-    def translate(self, input_file: str, output_file: str) -> None:
+    def translate(self, input_file: str, output_file: str, llm_model: str) -> None:
         try:
             logger.info("字幕优化任务开始...")     
             # 获取API配置
-            llm_model = self.config["llm_model"]
+            llm_model = llm_model or self.config["llm_model"]
             api_base = self.config["api_base"]
             api_key = self.config["api_key"]
             
@@ -127,6 +127,7 @@ class SubtitleTranslator:
 def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
     parser.add_argument('input', help='输入字幕文件路径')
+    parser.add_argument('-m', '--llm_model', help='翻译模式', default=None)
     args = parser.parse_args()
     input_file = args.input
     output_file = input_file.replace('.srt', '_zh.srt')
@@ -140,7 +141,8 @@ def main():
         print(f"\n=================== 正在翻译 {input_file} ===================\n")
         translator.translate(
             input_file=input_file,
-            output_file=output_file
+            output_file=output_file,
+            llm_model=args.llm_model
         )
     except Exception as e:
         logger.exception(f"发生错误: {str(e)}")

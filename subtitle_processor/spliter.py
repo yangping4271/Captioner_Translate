@@ -340,12 +340,20 @@ def merge_short_segment(segments: List[ASRDataSeg]) -> None:
         total_words = current_words + next_words
         max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(current_seg.text) else MAX_WORD_COUNT_ENGLISH
 
+
         if time_gap < 300 and (current_words < 5 or next_words <= 5) and total_words <= max_word_count and "." not in current_seg.text:
             # 执行合并操作
+            logger.debug("============")
+            logger.debug(f"max_word_count: {max_word_count}")
+            logger.debug(f"current_seg: {current_seg.text}")
+            logger.debug(f"current_words: {current_words}")
+            logger.debug(f"next_seg: {next_seg.text}")
+            logger.debug(f"next_words: {next_words}")
+            logger.debug(f"total_words: {total_words}")
             logger.debug(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {time_gap}")
-            
             # 更新当前段落的文本和结束时间
-            current_seg.text = current_seg.text + next_seg.text
+            current_seg.text += " " + next_seg.text
+            logger.debug(f"合并后: {current_seg.text}")
             current_seg.end_time = next_seg.end_time
             
             # 从列表中移除下一个段落
@@ -381,7 +389,7 @@ def preprocess_segments(segments: List[ASRDataSeg], need_lower=True) -> List[ASR
     for seg in segments:
         if not is_pure_punctuation(seg.text):
             # 如果文本只包含字母、数字和撇号，则将其转换为小写并添加一个空格
-            if re.match(r'^[a-zA-Z0-9\']+$', seg.text.strip()):
+            if re.match(r'^[a-zA-Z0-9\'\,\.\!\?]+$', seg.text.strip()):
                 if need_lower:
                     seg.text = seg.text.lower() + " "
                 else:
@@ -609,7 +617,9 @@ def merge_segments(asr_data: ASRData,
 
     # 预处理ASR数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
+    logger.debug(f"预处理ASR数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
     txt = asr_data.to_txt().replace("\n", "")
+    logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
 
     # 确定分段数，分割ASRData
@@ -637,6 +647,10 @@ def merge_segments(asr_data: ASRData,
         final_segments.extend(segment)
 
     final_segments.sort(key=lambda seg: seg.start_time)
+
+    final_txt = [seg.text for seg in final_segments]
+    logger.debug("============")
+    logger.debug(f"最终分段: {final_txt}")
 
     merge_short_segment(final_segments)
 

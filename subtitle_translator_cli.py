@@ -34,7 +34,8 @@ class SubtitleTranslator:
             "thread_num": 10,
             "batch_size": 20,
             "max_word_count_cjk": 18,
-            "max_word_count_english": 12,
+            "max_word_count_english": 14,
+            "need_reflect": False
         }
 
     def translate(self, input_file: str, output_file: str, llm_model: str) -> None:
@@ -48,6 +49,7 @@ class SubtitleTranslator:
             if not test_openai(api_base, api_key, llm_model):
                 raise Exception("OpenAI API 测试失败, 请检查设置")
 
+            logger.info(f"使用 {api_base} 作为API端点")
             logger.info(f"使用 {llm_model} 作为LLM模型")
             os.environ['OPENAI_BASE_URL'] = api_base
             os.environ['OPENAI_API_KEY'] = api_key
@@ -89,7 +91,7 @@ class SubtitleTranslator:
                 logger.info(f"总结字幕内容:{summarize_result}")
                 
             logger.info("正在优化+翻译...")
-            need_reflect = False
+            need_reflect = self.config["need_reflect"]
             optimizer = SubtitleOptimizer(
                 summary_content=summarize_result,
                 model=llm_model,
@@ -129,7 +131,7 @@ class SubtitleTranslator:
 def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
     parser.add_argument('input', help='输入字幕文件路径')
-    parser.add_argument('-m', '--llm_model', help='翻译模式', default=None)
+    parser.add_argument('-m', '--llm_model', help='LLM模型', default=None)
     args = parser.parse_args()
     input_file = args.input
     output_file = input_file.replace('.srt', '_zh.srt')

@@ -59,7 +59,7 @@ def split_by_llm_retry(text: str,
     )
     result = response.choices[0].message.content
 
-    # print(f"断句结果: {result}")
+    logger.debug(f"断句结果: {result}")
     # 清理结果中的多余换行符
     result = re.sub(r'\n+', '', result)
     split_result = [segment.strip() for segment in result.split("<br>") if segment.strip()]

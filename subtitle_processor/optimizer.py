@@ -200,8 +200,13 @@ class SubtitleOptimizer:
             messages=message,
             temperature=0.7)
         response_content = json_repair.loads(response.choices[0].message.content)
+        logger.debug("===========start===========")
+        logger.debug(f"original_subtitle: {original_subtitle}")
+        logger.debug(f"len(original_subtitle): {len(original_subtitle)}")
+        logger.debug(f"response: {response_content}")
+        logger.debug(f"len(response_content): {len(response_content)}")
+        logger.debug("===========end===========")
         assert isinstance(response_content, dict) and len(response_content) == len(original_subtitle), "翻译结果错误"
-        # logger.info(f"翻译结果：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}, 翻译条数：{len(response_content)}")
         translated_subtitle = {}
         original_list = list(original_subtitle.values())
         translated_list = list(response_content.values())

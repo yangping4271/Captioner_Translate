@@ -59,10 +59,10 @@ def split_by_llm_retry(text: str,
     )
     result = response.choices[0].message.content
 
-    logger.debug(f"断句结果: {result}")
     # 清理结果中的多余换行符
     result = re.sub(r'\n+', '', result)
     split_result = [segment.strip() for segment in result.split("<br>") if segment.strip()]
+    logger.debug(f"断句结果: {split_result}")
 
     br_count = len(split_result)
     if br_count < count_words(text) / MAX_WORD_COUNT * 0.9:

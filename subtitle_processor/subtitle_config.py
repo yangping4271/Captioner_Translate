@@ -6,6 +6,7 @@ Requirements:
 - For Chinese, Japanese, or other Asian languages, each segment should not exceed [max_word_count_cjk] words.
 - For English, each segment should not exceed [max_word_count_english] words.
 - Each sentence should not be too short. Try to make each segment longer than 10 characters.
+- Sentences punctuated with periods should be separately segmented.
 - Segment based on semantics if a sentence is too long.
 - Do not modify or add any content to the original text; simply insert <br> between each segment.
 - Directly return the segmented text without any additional explanations.

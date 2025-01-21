@@ -73,6 +73,7 @@ class SubtitleTranslator:
                                        num_threads=self.config["thread_num"], 
                                        max_word_count_cjk=self.config["max_word_count_cjk"], 
                                        max_word_count_english=self.config["max_word_count_english"])
+                logger.debug(f"优化结果: {[seg.text for seg in asr_data.segments]}")
                 asr_data.save(save_path=split_path)
                 if os.path.exists(split_path):
                     logger.info(f"字幕断句完成，已保存至: {split_path}")

@@ -109,9 +109,9 @@ def merge_segments_based_on_sentences(segments: List[ASRDataSeg], sentences: Lis
     # logger.debug(f"ASR分段: {asr_texts}")
 
     for sentence in sentences:
-        logger.debug(f"==========")
-        logger.debug(f"处理句子: {sentence}")
-        logger.debug("后续句子:" + "".join(asr_texts[asr_index: asr_index+10]))
+        # logger.debug(f"==========")
+        # logger.debug(f"处理句子: {sentence}")
+        # logger.debug("后续句子:" + "".join(asr_texts[asr_index: asr_index+10]))
 
         sentence_proc = preprocess_text(sentence)
         word_count = count_words(sentence_proc)
@@ -158,8 +158,6 @@ def merge_segments_based_on_sentences(segments: List[ASRDataSeg], sentences: Lis
                 merged_start_time = group[0].start_time
                 merged_end_time = group[-1].end_time
                 merged_seg = ASRDataSeg(merged_text, merged_start_time, merged_end_time)
-                
-                logger.debug(f"合并分段: {merged_seg.text}")
                 
                 # 考虑最大词数的拆分
                 split_segs = split_long_segment(group)
@@ -617,7 +615,7 @@ def merge_segments(asr_data: ASRData,
 
     # 预处理ASR数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
-    logger.debug(f"预处理ASR数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
+    # logger.debug(f"预处理ASR数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
     txt = asr_data.to_txt().replace("\n", "")
     logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)

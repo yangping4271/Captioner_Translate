@@ -104,62 +104,105 @@ Output:
 ```
 """
 
-TRANSLATE_PROMPT = """
-Translate the provided subtitles into the target language while adhering to specific guidelines for cultural and stylistic adaptation.
+# TRANSLATE_PROMPT = """
+# Translate the provided subtitles into the target language while adhering to specific guidelines for cultural and stylistic adaptation.
 
-- **Translation Approach**:
-  - **Meaning-Based**: Use a free translation method to adapt the content to the cultural and stylistic norms of the target language.
-  - **Natural Translation**: Avoid translationese and ensure the translation conforms to the grammatical and reading standards of the target language.
-  - Retain key terms such as technical jargon, proper nouns, acronyms, and abbreviations.
-  - **Cultural Relevance**:
-    - **Idioms**: Utilize idioms from the target language to convey meanings succinctly and vividly.
-    - **Internet Slang**: Incorporate contemporary internet slang to make translations more relatable to modern audiences.
-    - **Culturally Appropriate Expressions**: Adapt phrases to align with local cultural contexts, enhancing engagement and relatability.
+# - **Translation Approach**:
+#   - **Meaning-Based**: Use a free translation method to adapt the content to the cultural and stylistic norms of the target language.
+#   - **Natural Translation**: Avoid translationese and ensure the translation conforms to the grammatical and reading standards of the target language.
+#   - Retain key terms such as technical jargon, proper nouns, acronyms, and abbreviations.
+#   - **Cultural Relevance**:
+#     - **Idioms**: Utilize idioms from the target language to convey meanings succinctly and vividly.
+#     - **Internet Slang**: Incorporate contemporary internet slang to make translations more relatable to modern audiences.
+#     - **Culturally Appropriate Expressions**: Adapt phrases to align with local cultural contexts, enhancing engagement and relatability.
+
+# - **Languages**:
+#   - Translate subtitles into [TargetLanguage].
+
+# # Steps
+
+# 1. Review each subtitle for context and meaning.
+# 2. Translate each subtitle individually, ensuring no merging or splitting of subtitles.
+# 3. Apply cultural and stylistic adaptations as per the guidelines.
+# 4. Retain key terms and ensure the translation is natural and idiomatic.
+
+# # Output Format
+
+# - Maintain the original input format:
+#   ```json
+#   {
+#     "0": "Translated Subtitle 1",
+#     "1": "Translated Subtitle 2",
+#     ...
+#   }
+#   ```
+
+# # Examples
+
+# **Input**:
+# ```json
+# {
+#   "0": "Original Subtitle 1",
+#   "1": "Original Subtitle 2"
+# }
+# ```
+
+# **Output**:
+# ```json
+# {
+#   "0": "Translated Subtitle 1",
+#   "1": "Translated Subtitle 2"
+# }
+# ```
+
+# # Notes
+
+# - Ensure each subtitle is translated independently without altering the sequence or structure.
+# - Pay special attention to cultural nuances and idiomatic expressions to enhance relatability and engagement.
+# """
+
+TRANSLATE_PROMPT = """
+Translate the provided subtitles into the target language while adhering to these strict requirements:
+
+1. CRITICAL: The output MUST have exactly the same number of subtitles as the input
+2. CRITICAL: Each subtitle index in the input MUST have a corresponding translation in the output
+3. CRITICAL: DO NOT merge or combine adjacent subtitles, even if they seem connected
+4. CRITICAL: DO NOT skip any subtitle numbers
+
+Translation Guidelines:
+- Use meaning-based translation adapted to target language norms
+- Preserve key terms (technical terms, proper nouns, acronyms)
+- Adapt cultural elements appropriately
+- Maintain natural flow in target language
 
 - **Languages**:
   - Translate subtitles into [TargetLanguage].
 
-# Steps
+Validation Steps:
+1. Count input subtitles
+2. Translate each subtitle independently
+3. Verify output subtitle count matches input
+4. Confirm each input index has a corresponding translation
 
-1. Review each subtitle for context and meaning.
-2. Translate each subtitle individually, ensuring no merging or splitting of subtitles.
-3. Apply cultural and stylistic adaptations as per the guidelines.
-4. Retain key terms and ensure the translation is natural and idiomatic.
-
-# Output Format
-
-- Maintain the original input format:
-  ```json
-  {
-    "0": "Translated Subtitle 1",
-    "1": "Translated Subtitle 2",
-    ...
-  }
-  ```
-
-# Examples
-
-**Input**:
+Input Format Example:
 ```json
 {
-  "0": "Original Subtitle 1",
-  "1": "Original Subtitle 2"
+  "51": "Original text 1",
+  "52": "Original text 2"
 }
 ```
 
-**Output**:
+Required Output Format:
 ```json
 {
-  "0": "Translated Subtitle 1",
-  "1": "Translated Subtitle 2"
+  "51": "Translated text 1",
+  "52": "Translated text 2"
 }
 ```
 
-# Notes
-
-- Ensure each subtitle is translated independently without altering the sequence or structure.
-- Pay special attention to cultural nuances and idiomatic expressions to enhance relatability and engagement.
+IMPORTANT: Even if two subtitles form a complete sentence together, they MUST remain as separate entries in the output.
 """
+
 
 REFLECT_TRANSLATE_PROMPT = """
 You are a subtitle proofreading and translation expert. Your task is to process subtitles generated through speech recognition.

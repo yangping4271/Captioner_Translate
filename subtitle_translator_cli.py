@@ -32,7 +32,7 @@ class SubtitleTranslator:
             "target_language": "简体中文",
             "subtitle_layout": "仅译文",
             "thread_num": 10,
-            "batch_size": 20,
+            "batch_size": 10,
             "max_word_count_cjk": 18,
             "max_word_count_english": 14,
             "need_reflect": False
@@ -65,8 +65,8 @@ class SubtitleTranslator:
 
             # 检查是否需要合并重新断句
             split_path = input_file.replace('.srt', '_en.srt')
-            if not asr_data.is_word_timestamp():
-                asr_data.split_to_word_segments()
+            # if not asr_data.is_word_timestamp():
+            #     asr_data.split_to_word_segments()
             if asr_data.is_word_timestamp():
                 logger.info("正在字幕断句...")
                 asr_data = merge_segments(asr_data, model=llm_model, 
@@ -100,10 +100,10 @@ class SubtitleTranslator:
                 batch_num=self.config["batch_size"],
                 thread_num=self.config["thread_num"],
                 need_remove_punctuation=False,
-                cjk_only=True
+                cjk_only=True,
+                reflect=self.config["need_reflect"]
             )
-            optimizer_result = optimizer.optimizer_multi_thread(subtitle_json, translate=True,
-                                                                 reflect=need_reflect)
+            optimizer_result = optimizer.optimizer_multi_thread(subtitle_json)
 
             # 替换优化或者翻译后的字幕
             for i, subtitle_text in optimizer_result.items():

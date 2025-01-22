@@ -1,4 +1,4 @@
-# VideoCaptioner
+# Captioner_Translate
 
 基于 OpenAI API 的智能字幕翻译和优化工具。支持将英文字幕翻译成中文，并进行智能分段和优化处理。
 

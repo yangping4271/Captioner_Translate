@@ -29,15 +29,16 @@ for file in $files; do
     if [ -f "./${file}_zh.srt" ]; then
         if [ -f "./${file}_en.srt" ]; then
             echo "INFO: ${file}_en.srt and ${file}_zh.srt already exist."
-        elif [ -f "./${file}.srt" ] ; then
+        fi
+        if [ -f "./${file}.srt" ] ; then
             mv "./${file}.srt" "./${file}_en.srt"
         fi
     # 如果存在en.srt，则翻译en文件
     elif [ -f "./${file}_en.srt" ]; then
         if [ -f "./${file}.srt" ]; then
             mv "./${file}.srt" "./${file}_original.srt"
-            mv "./${file}_en.srt" "./${file}.srt"
         fi
+        mv "./${file}_en.srt" "./${file}.srt"
         python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
     # 只有.srt，则翻译.srt
     elif [ -f "./${file}.srt" ]; then

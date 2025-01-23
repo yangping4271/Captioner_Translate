@@ -31,11 +31,12 @@ class SubtitleTranslator:
             "api_base": os.getenv('OPENAI_BASE_URL'),
             "target_language": "简体中文",
             "subtitle_layout": "仅译文",
-            "thread_num": 10,
+            "thread_num": 15,
             "batch_size": 10,
             "max_word_count_cjk": 18,
             "max_word_count_english": 14,
-            "need_reflect": False
+            "need_optimize": False,
+            "need_reflect": True
         }
 
     def translate(self, input_file: str, output_file: str, llm_model: str) -> None:
@@ -60,20 +61,19 @@ class SubtitleTranslator:
             if not Path(input_file).suffix in ['.srt', '.vtt', '.ass']:
                 raise Exception("字幕文件格式不支持")
 
-            logger.info("开始优化字幕...")
             asr_data = from_subtitle_file(input_file)
 
-            # 检查是否需要合并重新断句
+            # 检查是否需要重新断句
             split_path = input_file.replace('.srt', '_en.srt')
-            # if not asr_data.is_word_timestamp():
-            #     asr_data.split_to_word_segments()
+            if self.config["need_optimize"] and not asr_data.is_word_timestamp():
+                logger.info("开始优化字幕...")
+                asr_data.split_to_word_segments()
             if asr_data.is_word_timestamp():
                 logger.info("正在字幕断句...")
                 asr_data = merge_segments(asr_data, model=llm_model, 
                                        num_threads=self.config["thread_num"], 
                                        max_word_count_cjk=self.config["max_word_count_cjk"], 
                                        max_word_count_english=self.config["max_word_count_english"])
-                logger.debug(f"优化结果: {[seg.text for seg in asr_data.segments]}")
                 asr_data.save(save_path=split_path)
                 if os.path.exists(split_path):
                     logger.info(f"字幕断句完成，已保存至: {split_path}")
@@ -91,8 +91,7 @@ class SubtitleTranslator:
                 summarize_result = summarizer.summarize(asr_data.to_txt())
                 logger.info(f"总结字幕内容:{summarize_result}")
                 
-            logger.info("正在优化+翻译...")
-            need_reflect = self.config["need_reflect"]
+            logger.info("正在翻译...")
             optimizer = SubtitleOptimizer(
                 summary_content=summarize_result,
                 model=llm_model,

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-en_files=$(ls *_en.srt 2>/dev/null | sed 's/_en\.srt$//')
+en_files=$(ls *_en.srt 2>/dev/null | sed 's/_en\.srt$//' | sort -V)
 # 列出当前目录下所有的 .srt 文件，并过滤掉以 _en.srt 和 _zh.srt 结尾的文件
-files=$(ls *.srt 2>/dev/null | grep -v '_en\.srt\|_zh\.srt' | sed 's/.srt$//')
+files=$(ls *.srt 2>/dev/null | grep -v '_en\.srt\|_zh\.srt' | sed 's/.srt$//' | sort -V)
 
-# 合并两个文件列表 files 和 en_files，并去除重复的文件名
-files=$(echo -e "$files\n$en_files" | awk '!seen[$0]++')
+# 合并两个文件列表 files 和 en_files，并去除重复的文件名，保持自然排序
+files=$(echo -e "$files\n$en_files" | sort -V | awk '!seen[$0]++')
 
 if [ -z "$files" ]; then
     echo "No files to translate."

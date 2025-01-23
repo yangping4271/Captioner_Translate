@@ -126,11 +126,10 @@ class SubtitleOptimizer:
 
         if self.llm_result_logger:
             for k, v in response_content.items():
-                self.llm_result_logger.info("start===========")
+                self.llm_result_logger.info("=======================================")
                 self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
                 self.llm_result_logger.info(f"翻译后字幕：{v['translation']}")
                 self.llm_result_logger.info(f"反思后字幕：{v['revised_translation']}")
-                self.llm_result_logger.info("end===========")
         return translated_subtitle
 
     def _normal_translate(self, original_subtitle: Dict[int, str]):

@@ -28,7 +28,7 @@ class SubtitleTranslator:
             "target_language": "简体中文",
             "subtitle_layout": "仅译文",
             "thread_num": 15,
-            "batch_size": 10,
+            "batch_size": 20,
             "max_word_count_cjk": 18,
             "max_word_count_english": 14,
             "need_reflect": True

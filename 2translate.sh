@@ -40,6 +40,11 @@ for file in $files; do
         fi
         mv "./${file}_en.srt" "./${file}.srt"
         python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
+        # 没有断句，恢复原来的文件
+        if [ -f "./${file}.srt" ]; then
+            mv "./${file}.srt" "./${file}_en.srt"
+        fi
+
     # 只有.srt，则翻译.srt
     elif [ -f "./${file}.srt" ]; then
         python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"

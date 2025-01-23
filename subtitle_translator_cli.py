@@ -130,7 +130,7 @@ def main():
 
     try:
         translator = SubtitleTranslator()
-        print(f"\n=================== 正在翻译 {input_file} ===================\n")
+        print(f"\n=================== 正在翻译 {input_file.replace('.srt', '')} ===================\n")
         translator.translate(
             input_file=input_file,
             output_file=output_file,

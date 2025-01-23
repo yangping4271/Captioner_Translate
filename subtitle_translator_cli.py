@@ -19,7 +19,6 @@ logger = setup_logger("subtitle_translator_cli")
 class SubtitleTranslator:
     def __init__(self):
         self.config = self._load_config()
-        self.custom_prompt_text = ""
 
     def _load_config(self) -> Dict[str, Any]:
         return {
@@ -74,11 +73,9 @@ class SubtitleTranslator:
                     raise Exception("字幕断句失败...")
                 
             logger.info("总结字幕...")
-            summarize_result = self.custom_prompt_text.strip()
-            if not summarize_result:
-                summarizer = SubtitleSummarizer(model=llm_model)
-                summarize_result = summarizer.summarize(asr_data.to_txt())
-                logger.info(f"总结字幕内容:{summarize_result}")
+            summarizer = SubtitleSummarizer(model=llm_model)
+            summarize_result = summarizer.summarize(asr_data.to_txt())
+            logger.info(f"总结字幕内容:{summarize_result}")
                 
             logger.info("正在翻译...")
             translator = SubtitleOptimizer(

@@ -36,12 +36,12 @@ class SubtitleTranslator:
             "max_word_count_cjk": 18,
             "max_word_count_english": 14,
             "need_optimize": False,
-            "need_reflect": True
+            "need_reflect": False
         }
 
     def translate(self, input_file: str, output_file: str, llm_model: str) -> None:
         try:
-            logger.info("字幕优化任务开始...")     
+            logger.info("字幕处理任务开始...")     
             # 获取API配置
             llm_model = llm_model or self.config["llm_model"]
             api_base = self.config["api_base"]
@@ -80,10 +80,6 @@ class SubtitleTranslator:
                 else:
                     raise Exception("字幕断句失败...")
 
-            # 制作成请求llm接口的格式 {{"1": "original_subtitle"},...}
-            subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
-            self.subtitle_length = len(subtitle_json)
-
             summarize_result = self.custom_prompt_text.strip()
             logger.info("总结字幕...")
             if not summarize_result:
@@ -99,15 +95,31 @@ class SubtitleTranslator:
                 batch_num=self.config["batch_size"],
                 thread_num=self.config["thread_num"],
                 need_remove_punctuation=False,
-                cjk_only=True,
-                reflect=self.config["need_reflect"]
+                cjk_only=True
             )
-            optimizer_result = optimizer.optimizer_multi_thread(subtitle_json)
 
-            # 替换优化或者翻译后的字幕
-            for i, subtitle_text in optimizer_result.items():
-                seg = asr_data.segments[int(i) - 1]
-                seg.text = subtitle_text
+            if self.config["need_optimize"]:
+                # 制作成请求llm接口的格式 {{"1": "original_subtitle"},...}
+                subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
+                self.subtitle_length = len(subtitle_json)
+                optimizer_result = optimizer.optimizer_multi_thread(subtitle_json,
+                                                               translate=False)
+
+                # 替换优化后的字幕  
+                for i, subtitle_text in optimizer_result.items():
+                    seg = asr_data.segments[int(i) - 1]
+                    seg.text = subtitle_text
+            else:
+                subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
+                self.subtitle_length = len(subtitle_json)
+                translate_result = optimizer.optimizer_multi_thread(subtitle_json,
+                                                            translate=True,
+                                                            reflect=self.config["need_reflect"])
+
+                # 替换优化或者翻译后的字幕
+                for i, subtitle_text in translate_result.items():
+                    seg = asr_data.segments[int(i) - 1]
+                    seg.text = subtitle_text
 
             # 保存字幕
             subtitle_layout = self.config["subtitle_layout"]

@@ -75,49 +75,62 @@ class SubtitleOptimizer:
             finally:
                 self.executor = None
 
-    def optimizer_multi_thread(self, subtitle_json: Dict[int, str]):
+    def optimizer_multi_thread(self, subtitle_json: Dict[int, str],
+                               translate=False,
+                               reflect=False,
+                               callback=None):
         batch_num = self.batch_num
         items = list(subtitle_json.items())[:]
         chunks = [dict(items[i:i + batch_num]) for i in range(0, len(items), batch_num)]
 
         def process_chunk(chunk):
-            try:
-                result = self.translate(chunk)
-            except Exception as e:
-                logger.error(f"翻译失败，使用单条翻译：{e}")
-                result = self.translate_single(chunk)
+            if translate:
+                try:
+                    result = self.translate(chunk, reflect)
+                except Exception as e:
+                    logger.error(f"翻译失败，使用单条翻译：{e}")
+                    result = self.translate_single(chunk)
+            else:
+                try:
+                    result = self.optimize(chunk)
+                except Exception as e:
+                    logger.error(f"优化失败：{e}")
+                    result = chunk
+            if callback:
+                callback(result)
             return result
 
-        try:
-            # 设置超时时间（秒）
-            timeout = 300  # 5分钟
-            results = []
-            
-            # 使用map并设置超时
-            future_to_chunk = {self.executor.submit(process_chunk, chunk): chunk for chunk in chunks}
-            for future in concurrent.futures.as_completed(future_to_chunk, timeout=timeout):
-                try:
-                    result = future.result()
-                    results.append(result)
-                except concurrent.futures.TimeoutError:
-                    logger.error(f"处理超时")
-                    continue
-                except Exception as e:
-                    logger.error(f"处理失败: {e}")
-                    continue
+        results = list(self.executor.map(process_chunk, chunks))
 
-            # 合并结果
-            optimizer_result = {k: v for result in results for k, v in result.items()}
-            return optimizer_result
-        except Exception as e:
-            logger.error(f"多线程处理失败: {e}")
-            # 如果多线程处理失败，尝试单线程处理
-            optimizer_result = {}
-            for chunk in chunks:
-                result = process_chunk(chunk)
-                optimizer_result.update(result)
-            return optimizer_result
+        # 合并结果
+        optimizer_result = {k: v for result in results for k, v in result.items()}
+        return optimizer_result
+    
+    @retry.retry(tries=2)
+    def optimize(self, original_subtitle: Dict[int, str]) -> Dict[int, str]:
+        """ Optimize the given subtitle. """
+        logger.info(f"[+]正在优化字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
 
+        message = self._create_optimizer_message(original_subtitle)
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            stream=False,
+            messages=message,
+            timeout=80)
+
+        optimized_text = json_repair.loads(response.choices[0].message.content)
+
+        aligned_subtitle = repair_subtitle(original_subtitle, optimized_text)  # 修复字幕对齐问题
+
+        for k, v in aligned_subtitle.items():
+            optimized_text = self.remove_punctuation(v)
+            aligned_subtitle[k] = optimized_text
+            self.llm_result_logger.info(f"优化字幕：{original_subtitle[k]}")
+            self.llm_result_logger.info(f"优化结果：{optimized_text}")
+            self.llm_result_logger.info("===========")
+        return aligned_subtitle
+    
     @retry.retry(tries=2)
     def translate(self, original_subtitle: Dict[int, str], reflect=False) -> Dict[int, str]:
         """优化并翻译给定的字幕。"""
@@ -128,7 +141,7 @@ class SubtitleOptimizer:
 
     def _reflect_translate(self, original_subtitle: Dict[int, str]):
         logger.info(f"[+]正在反思翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
-        message = self._create_translate_message(original_subtitle)
+        message = self._create_translate_message(original_subtitle, reflect=True)
         response = self.client.chat.completions.create(
             model=self.model,
             stream=False,
@@ -149,7 +162,6 @@ class SubtitleOptimizer:
 
         if self.llm_result_logger:
             for k, v in response_content.items():
-                self.llm_result_logger.info(f"原字幕：-----")
                 self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
                 self.llm_result_logger.info(f"翻译后字幕：{v['translation']}")
                 self.llm_result_logger.info(f"反思后字幕：{v['revised_translation']}")
@@ -185,15 +197,23 @@ class SubtitleOptimizer:
 
         return translated_subtitle
 
-    def _create_translate_message(self, original_subtitle: Dict[int, str]):
+    def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
         input_content = f"correct the original subtitles, and translate them into {self.target_language}:\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
         if self.summary_content:
             input_content += f"\nThe following is reference material related to subtitles, based on which the subtitles will be corrected, optimized, and translated:\n<prompt>{self.summary_content}</prompt>\n"
-        if self.reflect:
+        if reflect:
             prompt = REFLECT_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)
         else:
             prompt = TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)
         message = [{"role": "system", "content": prompt},
+                   {"role": "user", "content": input_content}]
+        return message
+
+    def _create_optimizer_message(self, original_subtitle):
+        input_content = f"Optimize the following subtitles:\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
+        if self.summary_content:
+            input_content += f"\nThe following is reference material related to subtitles, based on which the subtitles will be corrected and optimized.:\n<prompt>{self.summary_content}</prompt>\n"
+        message = [{"role": "system", "content": OPTIMIZER_PROMPT},
                    {"role": "user", "content": input_content}]
         return message
 

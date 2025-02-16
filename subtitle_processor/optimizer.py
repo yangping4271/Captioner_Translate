@@ -35,7 +35,7 @@ class SubtitleOptimizer:
         summary_content: str = "",
         thread_num: int = MAX_THREADS,
         batch_num: int = BATCH_SIZE,
-        target_language: str = "Chinese",
+        target_language: str = "简体中文",
         llm_result_logger: logging.Logger = logger,
         need_remove_punctuation: bool = True,
         cjk_only: bool = True,

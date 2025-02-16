@@ -19,7 +19,7 @@ from subtitle_processor.aligner import SubtitleAligner
 from utils import json_repair
 from utils.logger import setup_logger
 
-logger = setup_logger("subtitle_optimizer")
+logger = setup_logger("subtitle_optimizer", log_level=logging.DEBUG)
 
 BATCH_SIZE = 20
 MAX_THREADS = 10
@@ -127,6 +127,7 @@ class SubtitleOptimizer:
         if self.llm_result_logger:
             for k, v in response_content.items():
                 self.llm_result_logger.debug("=======================================")
+                self.llm_result_logger.debug(f"原始字幕：{original_subtitle[k]}")
                 self.llm_result_logger.debug(f"优化字幕：{v['optimized_subtitle']}")
                 self.llm_result_logger.debug(f"翻译后字幕：{v['translation']}")
                 self.llm_result_logger.debug(f"反思后字幕：{v['revised_translation']}")

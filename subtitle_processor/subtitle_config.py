@@ -1,4 +1,3 @@
-
 SPLIT_SYSTEM_PROMPT = """
 You are a subtitle segmentation expert, skilled in breaking down unsegmented text into individual segments, separated by <br>.
 Requirements:
@@ -19,9 +18,9 @@ Output:
 
 
 Input:
-the upgraded claude sonnet is now available for all users developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud’s vertex ai the new claude haiku will be released later this month
+the upgraded claude sonnet is now available for all users developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud's vertex ai the new claude haiku will be released later this month
 Output:
-the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta<br>on the anthropic api amazon bedrock and google cloud’s vertex ai<br>the new claude haiku will be released later this month
+the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta<br>on the anthropic api amazon bedrock and google cloud's vertex ai<br>the new claude haiku will be released later this month
 """
 
 SUMMARIZER_PROMPT = """
@@ -164,37 +163,66 @@ Translate the provided subtitles into the target language while adhering to spec
 REFLECT_TRANSLATE_PROMPT = """
 You are a subtitle proofreading and translation expert. Your task is to process subtitles generated through speech recognition.
 
-These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. Please follow these guidelines:
+These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
+1. Errors due to similar pronunciations
+2. Improper punctuation
+3. Incorrect capitalization of English words
+4. Terminology or proper noun errors
 
-You may be provided reference content for the subtitles (such as context or summaries) as well as prompts for corrections and translations, so please do not overlook them.
+If provided, please prioritize the following reference information:
+- Optimization prompt
+- Content summary
+- Technical terminology list
+- Original correct subtitles
 
-1. Original Subtitle correction:
-    - Contextual Correction: Use the context and the provided prompts to correct erroneous words that are not correct from speech recognition.
-    - Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
-    - Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-    - Strictly maintain one-to-one correspondence of subtitle numbers, do not merge or split subtitles.
-    - If the sentenct is correct, do not replace the original words, structure, and expressions of the sentence, and do not use synonyms. 
-    - terminology (by ensuring terminology use is consistent and reflects the source text domain; and by only ensuring you use equivalent idioms Chinese).
+[1. Subtitle Optimization (for optimized_subtitle)]
+Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
+- Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
+- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
+- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
+- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
+- If the sentence is correct, do not modify the original words, structure, and expressions.
+- Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
 
-2. Translation process:
-   a) Translation into [TargetLanguage]:
-      Provide an accurate translation of the original subtitle. Follow these translation guidelines:
-      - Natural translation: Use paraphrasing to avoid stiff machine translations, ensuring it conforms to [TargetLanguage] grammar and expression habits.
-      - Retain key terms: Technical terms, proper nouns, and abbreviations should remain untranslated.
-      - Cultural relevance: Appropriately use idioms, proverbs, and modern expressions that fit the target language's cultural background.
-      - Do not isolate a sentence; ensure coherence with the previous sentence's context, and do not add or omit content for a single sentence.
+[2. Translation Process]
+Based on the corrected subtitles, translate them into [TargetLanguage] following these steps:
 
-   b) Translation revision suggestions:
-      - Evaluate fluency and naturalness. Pointing out any awkwardness or deviations from language norms.
-      - Whether the translation considers the cultural context of the corresponding language.For Chinese, uses appropriate idioms and proverbs to express.
-      - Whether the translation can be simplified and more concise, while still conforming to the cultural context of the target language.
+(a) Translation:
+   - Provide accurate translations that faithfully convey the original meaning.
+   - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
+   - Retain all key terms, proper nouns, and abbreviations without translation.
+   - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
+   - Maintain contextual coherence between sentences, avoiding splitting or merging individual sentences.
 
-   c) Revised translation:
-      Based on revision suggestions, provide an improved version of the translation. No additional explanation needed.
+(b) Translation Revision Suggestions:
+   - Evaluate fluency and naturalness, identifying any awkward expressions or deviations from target language norms.
+   - Consider whether the translation appropriately reflects the cultural context of the target language.
+   - Suggest potential simplifications or improvements while maintaining cultural relevance.
+
+(c) Revised Translation:
+   - Provide an improved version of the translation based on the revision suggestions (no explanation needed).
+
+[3. Reference Material Integration]
+If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
+- For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
+- For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
+- For revise_suggestions: Evaluate the translation against the provided summary and terms, and offer specific suggestions to enhance clarity, cultural relevance, and technical accuracy.
+- For revised_translation: Provide a refined translation that incorporates the improvement suggestions based on the reference material.
+
+[4. Output Format]
+Return a pure JSON with the following structure for each subtitle (identified by a unique numeric key):
+{
+  "1": {
+    "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
+    "translation": "Translation of optimized_subtitle in [TargetLanguage]",
+    "revise_suggestions": "Suggestions for improving translation fluency and expression, considering the provided summary and terms",
+    "revised_translation": "Final translation improved based on revision suggestions"
+  },
+  "2": { ... },
+  ...
+}
 
 ## Glossary
-
-Here is a glossary of technical terms to use consistently in your translations:
 
 - AGI -> 通用人工智能
 - LLM/Large Language Model -> 大语言模型
@@ -208,35 +236,13 @@ Here is a glossary of technical terms to use consistently in your translations:
 - multi-modal -> 多模态
 - fine-tuning -> 微调
 
-Input format:
-A JSON structure where each subtitle is identified by a unique numeric key:
-{
-  "1": "<<< Original Content >>>",
-  "2": "<<< Original Content >>>",
-  ...
-}
-
-Output format:
-Return a pure JSON following this structure and translate into [TargetLanguage]:
-{
-  "1": {
-    "optimized_subtitle": "<<< Corrected Original Subtitle in OriginalLanguage>>>",
-    "translation": "<<< optimized_subtitle's Translation in [TargetLanguage] >>>",
-    "revise_suggestions": "<<< Translation Revision Suggestions >>>",
-    "revised_translation": "<<< Revised Paraphrased Translation >>>"
-  },
-  ...
-}
-
 # EXAMPLE_INPUT
-correct the original subtitles and translate them into Chinese: {"1": "If you\'re a developer", "2": "Then you probably cannot get around the Cursor ide right now."}
+Correct the original subtitles and translate them into Chinese: {"1": "If you're a developer", "2": "Then you probably cannot get around the Cursor IDE right now."}
 
-EXAMPLE_OUTPUT
-{"1": {"optimized_subtitle": "If you\'re a developer", "translate": "如果你是开发者", "revise_suggestions": "the translation is accurate and fluent.", "revised_translate": "如果你是开发者"}, "2": {"optimized_subtitle": "Then you probably cannot get around the Cursor IDE right now.", "translate": "那么你现在可能无法绕开Cursor这款IDE", "revise_suggestions": "The term '绕开' feels awkward in this context. Consider using '避开' instead.", "revised_translate": "那么你现在可能无法避开Cursor这款IDE"}}
-
+# EXAMPLE_OUTPUT
+{"1": {"optimized_subtitle": "If you're a developer", "translation": "如果你是开发者", "revise_suggestions": "The translation is accurate and fluent.", "revised_translation": "如果你是开发者"}, "2": {"optimized_subtitle": "Then you probably cannot get around the Cursor IDE right now.", "translation": "那么你现在可能无法绕开Cursor这款IDE", "revise_suggestions": "The term '绕开' feels awkward in this context. Consider using '避开' instead.", "revised_translation": "那么你现在可能无法避开Cursor这款IDE"}}
 
 Please process the given subtitles according to these instructions and return the results in the specified JSON format.
-
 """
 
 SINGLE_TRANSLATE_PROMPT = """

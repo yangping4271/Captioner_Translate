@@ -154,7 +154,8 @@ def merge_segments_based_on_sentences(segments: List[ASRDataSeg], sentences: Lis
             # logger.debug(f"分段组: {len(seg_groups)}")
 
             for group in seg_groups:
-                merged_text = ''.join(seg.text for seg in group)
+                # 修改合并文本的方式，添加空格
+                merged_text = ' '.join(seg.text.strip() for seg in group)
                 merged_start_time = group[0].start_time
                 merged_end_time = group[-1].end_time
                 merged_seg = ASRDataSeg(merged_text, merged_start_time, merged_end_time)
@@ -214,7 +215,8 @@ def split_long_segment(segs_to_merge: List[ASRDataSeg]) -> List[ASRDataSeg]:
     if not segs_to_merge:
         return result_segs
         
-    merged_text = ''.join(seg.text for seg in segs_to_merge)
+    # 修改合并文本的方式，添加空格
+    merged_text = ' '.join(seg.text.strip() for seg in segs_to_merge)
 
     # 根据文本类型确定最大词数限制
     max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(merged_text) else MAX_WORD_COUNT_ENGLISH
@@ -647,7 +649,7 @@ def merge_segments(asr_data: ASRData,
     final_segments.sort(key=lambda seg: seg.start_time)
 
     final_txt = [seg.text for seg in final_segments]
-    logger.debug("============")
+    logger.debug("==============最终分段=========================")
     logger.debug(f"最终分段: {final_txt}")
 
     merge_short_segment(final_segments)

@@ -618,7 +618,7 @@ def merge_segments(asr_data: ASRData,
     # 预处理ASR数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
     # logger.debug(f"预处理ASR数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
-    txt = asr_data.to_txt().replace("\n", "")
+    txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
     logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
 

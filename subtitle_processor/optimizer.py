@@ -11,7 +11,6 @@ from openai import OpenAI
 
 from .subtitle_config import (
     TRANSLATE_PROMPT,
-    OPTIMIZER_PROMPT,
     REFLECT_TRANSLATE_PROMPT,
     SINGLE_TRANSLATE_PROMPT
 )
@@ -19,7 +18,7 @@ from subtitle_processor.aligner import SubtitleAligner
 from utils import json_repair
 from utils.logger import setup_logger
 
-logger = setup_logger("subtitle_optimizer", log_level=logging.DEBUG)
+logger = setup_logger("subtitle_optimizer")
 
 BATCH_SIZE = 20
 MAX_THREADS = 10
@@ -126,11 +125,15 @@ class SubtitleOptimizer:
 
         if self.llm_result_logger:
             for k, v in response_content.items():
-                self.llm_result_logger.debug("=======================================")
-                self.llm_result_logger.debug(f"原始字幕：{original_subtitle[k]}")
-                self.llm_result_logger.debug(f"优化字幕：{v['optimized_subtitle']}")
-                self.llm_result_logger.debug(f"翻译后字幕：{v['translation']}")
-                self.llm_result_logger.debug(f"反思后字幕：{v['revised_translation']}")
+                if original_subtitle[k] != v['optimized_subtitle']  :
+                    self.llm_result_logger.info("==============优化字幕=========================")
+                    self.llm_result_logger.info(f"原始字幕：{original_subtitle[k]}")
+                    self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
+                if v['translation'] != v['revised_translation']:
+                    self.llm_result_logger.info("==============反思翻译=========================")
+                    self.llm_result_logger.info(f"反思建议：{v['revise_suggestions']}")
+                    self.llm_result_logger.info(f"翻译后字幕：{v['translation']}")
+                    self.llm_result_logger.info(f"反思后字幕：{v['revised_translation']}")
         return translated_subtitle
 
     def _normal_translate(self, original_subtitle: Dict[int, str]):

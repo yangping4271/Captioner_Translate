@@ -23,7 +23,7 @@ class SubtitleSummarizer:
     def summarize(self, subtitle_content: str) -> str:
         logger.info(f"开始摘要化字幕内容")
         try:
-            subtitle_content = subtitle_content[:3000]
+            # subtitle_content = subtitle_content[:3000]
             response = self.client.chat.completions.create(
                 model=self.model,
                 stream=False,

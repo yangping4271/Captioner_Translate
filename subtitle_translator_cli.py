@@ -72,12 +72,12 @@ class SubtitleTranslator:
                 else:
                     raise Exception("字幕断句失败...")
                 
-            logger.info("总结字幕...")
+            logger.info("正在使用%s总结字幕...", llm_model)
             summarizer = SubtitleSummarizer(model=llm_model)
             summarize_result = summarizer.summarize(asr_data.to_txt())
             logger.info(f"总结字幕内容:{summarize_result}")
                 
-            logger.info("正在翻译...")
+            logger.info("正在使用%s翻译字幕...", llm_model)
             translator = SubtitleOptimizer(
                 summary_content=summarize_result,
                 model=llm_model,

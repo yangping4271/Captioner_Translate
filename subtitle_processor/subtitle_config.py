@@ -24,83 +24,59 @@ the upgraded claude sonnet is now available for all users<br>developers can buil
 """
 
 SUMMARIZER_PROMPT = """
-您是一位**专业视频分析师**，擅长从视频字幕中准确提取信息，包括主要内容和重要术语。
+You are a professional video analyst specialized in extracting accurate information from video subtitles, including key content and important terminology.
 
-## 您的任务
+Your tasks are as follows:
 
-### 1. 总结视频内容
-- 确定视频类型，根据具体视频内容，解释翻译时需要注意的要点。
-- 提供详细总结：对视频内容提供详细说明。
+1. Validate and Correct Common Terms:
+   First, scan the content for any misrecognized or incorrect terms, particularly:
+   - AI-related terms (e.g., "ChatGPT" might be misrecognized as "Jack GPT" or "Chad GPT")
+   - Company names (e.g., "OpenAI", "Microsoft", "Google")
+   - Product names (e.g., "GPT-4", "Claude", "Gemini")
+   
+   Known Corrections:
+   - "Jack GPT" should always be corrected to "ChatGPT"
+   - "Chad GPT" should always be corrected to "ChatGPT"
+   - "Check GPT" should always be corrected to "ChatGPT"
+   
+   Apply these corrections before proceeding with the summary and term extraction.
 
-### 2. 提取所有重要术语
+2. Summarize the Video Content:
+   - Identify the video type and key translation considerations
+   - Provide a detailed summary using the corrected terms
+   - Ensure all technical terms used in the summary are accurate and standardized
 
-- 提取所有重要名词和短语（无需翻译）。你需要判断识别错误的词语，处理并纠正因同音字或相似音调造成的错误名称或者术语
+3. Extract Important Terms:
+   - Identify and validate all major nouns and phrases
+   - For AI-related terms:
+     * Use standard, official names (e.g., "ChatGPT" not "Jack GPT")
+     * Verify against known AI products and companies
+   - For other technical terms:
+     * Ensure consistency with industry standards
+     * Remove any misrecognized or incorrect variations
 
-## 输出格式
-
-以JSON格式返回结果，请使用原字幕语言。例如，如果原字幕是英语，则返回结果也使用英语。
-
-JSON应包括两个字段：`summary`和`terms`
-
-- **summary**：视频内容的总结。给出翻译建议。
-- **terms**：
-  - `entities`：人名、组织、物体、地点等名称。
-  - `keywords`：全部专业或技术术语，以及其他重要关键词或短语。不需要翻译。
-"""
-
-OPTIMIZER_PROMPT = """
-You are a subtitle correction expert.
-
-You will receive subtitle text generated through speech recognition, which may have the following issues:
-1. Errors due to similar pronunciations
-2. Improper punctuation
-3. Incorrect capitalization of English words
-4. Terminology or proper noun errors
-
-If provided, please prioritize the following reference information:
-- Optimization prompt
-- Content summary
-- Technical terminology list
-- Original correct subtitles
-
-Correction rules:
-1. Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
-2. Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)  
-3. Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-4. Strictly maintain one-to-one correspondence of subtitle numbers, do not merge or split subtitles
-5. Do not translate or add any explanations
-
-示例：
-
-Input:
-```
+Output Format:
+Return a JSON object in the original subtitle language with the following structure:
 {
-    "0": "那个我们今天要学习的是 bython 语言",
-    "1": "这个语言呢是在1991年被guidoan rossum多发明的",
-    "2": "他的特点是简单易懂，适合初学者学习",
-    "3": "嗯像print这样的函数很容易掌握",
-    "4": "小N 乘上N 减1 的一个运算",
-    "5": "就是print N 乘上N 减1"
+    "summary": "A comprehensive overview using corrected terms",
+    "terms": {
+        "entities": [
+            // List of validated names, organizations, etc.
+            // Must use correct, official names (e.g., "ChatGPT" not "Jack GPT")
+        ],
+        "keywords": [
+            // List of validated technical terms
+            // Must be industry-standard terminology
+        ]
+    }
 }
-参考信息：
-<prompt>
-- 内容：Python编程语言介绍
-- 术语：Python, Guido van Rossum
-- 要求：注意代码和数学公式的书写规范
-</prompt>
-```
 
-Output:
-```
-{
-    "0": "我们今天要学习的是 Python 语言",
-    "1": "这个语言是在1991年被 Guido van Rossum 发明的",
-    "2": "它的特点是简单易懂，适合初学者学习",
-    "3": "像 print() 这样的函数很容易掌握",
-    "4": "n × (n-1) 的一个运算",
-    "5": "就是 print(n*(n-1))"
-}
-```
+Validation Rules:
+1. All AI product names must match their official names
+2. Company names must be in their correct form
+3. Technical terms must be industry-standard
+4. Remove any terms that appear to be speech recognition errors
+5. Do not include misrecognized variations in either entities or keywords
 """
 
 TRANSLATE_PROMPT = """
@@ -192,12 +168,14 @@ Based on the corrected subtitles, translate them into [TargetLanguage] following
    - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
    - Retain all key terms, proper nouns, and abbreviations without translation.
    - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
-   - Maintain contextual coherence between sentences, avoiding splitting or merging individual sentences.
+   - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
 
 (b) Translation Revision Suggestions:
-   - Evaluate fluency and naturalness, identifying any awkward expressions or deviations from target language norms.
-   - Consider whether the translation appropriately reflects the cultural context of the target language.
-   - Suggest potential simplifications or improvements while maintaining cultural relevance.
+   - Focus ONLY on the current subtitle segment's translation quality
+   - DO NOT suggest completing incomplete sentences or adding context from other segments
+   - Evaluate translation accuracy, terminology consistency, and cultural appropriateness
+   - Point out any awkward expressions or unclear translations within the current segment
+   - Suggest improvements for technical terms or industry-specific language if needed
 
 (c) Revised Translation:
    - Provide an improved version of the translation based on the revision suggestions (no explanation needed).
@@ -206,7 +184,7 @@ Based on the corrected subtitles, translate them into [TargetLanguage] following
 If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
 - For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
 - For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
-- For revise_suggestions: Evaluate the translation against the provided summary and terms, and offer specific suggestions to enhance clarity, cultural relevance, and technical accuracy.
+- For revise_suggestions: Evaluate the translation against the provided summary and terms, and offer specific suggestions to enhance clarity, cultural relevance, and technical accuracy within the current segment only.
 - For revised_translation: Provide a refined translation that incorporates the improvement suggestions based on the reference material.
 
 [4. Output Format]
@@ -215,7 +193,7 @@ Return a pure JSON with the following structure for each subtitle (identified by
   "1": {
     "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
     "translation": "Translation of optimized_subtitle in [TargetLanguage]",
-    "revise_suggestions": "Suggestions for improving translation fluency and expression, considering the provided summary and terms",
+    "revise_suggestions": "Suggestions for improving translation quality ONLY for the current segment",
     "revised_translation": "Final translation improved based on revision suggestions"
   },
   "2": { ... },
@@ -237,10 +215,34 @@ Return a pure JSON with the following structure for each subtitle (identified by
 - fine-tuning -> 微调
 
 # EXAMPLE_INPUT
-Correct the original subtitles and translate them into Chinese: {"1": "If you're a developer", "2": "Then you probably cannot get around the Cursor IDE right now."}
+Correct the original subtitles and translate them into Chinese: 
+{
+  "1": "This makes brainstorming and drafting", 
+  "2": "and iterating on the text much easier.",
+  "3": "where you can collaboratively edit and refine text or code together with Jack GPT."
+}
 
 # EXAMPLE_OUTPUT
-{"1": {"optimized_subtitle": "If you're a developer", "translation": "如果你是开发者", "revise_suggestions": "The translation is accurate and fluent.", "revised_translation": "如果你是开发者"}, "2": {"optimized_subtitle": "Then you probably cannot get around the Cursor IDE right now.", "translation": "那么你现在可能无法绕开Cursor这款IDE", "revise_suggestions": "The term '绕开' feels awkward in this context. Consider using '避开' instead.", "revised_translation": "那么你现在可能无法避开Cursor这款IDE"}}
+{
+  "1": {
+    "optimized_subtitle": "This makes brainstorming and drafting",
+    "translation": "这使得头脑风暴和草拟",
+    "revise_suggestions": "Consider using more natural Chinese expressions for 'brainstorming'",
+    "revised_translation": "这让头脑风暴和起草"
+  },
+  "2": {
+    "optimized_subtitle": "and iterating on the text much easier.",
+    "translation": "以及对文本进行迭代变得更容易",
+    "revise_suggestions": "The translation is accurate and natural",
+    "revised_translation": "以及对文本进行迭代变得更容易"
+  },
+  "3": {
+    "optimized_subtitle": "where you can collaboratively edit and refine text or code together with ChatGPT",
+    "translation": "你可以与ChatGPT一起协作编辑和优化文本或代码",
+    "revise_suggestions": "The term 'Jack GPT' has been corrected to 'ChatGPT'. The translation accurately reflects the collaborative nature of the tool",
+    "revised_translation": "你可以与ChatGPT一起协作编辑和优化文本或代码"
+  }
+}
 
 Please process the given subtitles according to these instructions and return the results in the specified JSON format.
 """

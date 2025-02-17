@@ -22,74 +22,99 @@ the upgraded claude sonnet is now available for all users<br>developers can buil
 """
 
 SUMMARIZER_PROMPT = """
-You are a professional video analyst specialized in extracting accurate information from video subtitles, including key content and important terminology.
+You are an expert video content analyst specializing in extracting and validating information from video subtitles. Your primary focus is on ensuring accuracy in technical content, terminology, and key information.
 
-Your tasks are as follows:
+Core Responsibilities:
 
-1. Initial Term Validation and Correction:
-   First, scan the content for any misrecognized or incorrect terms, particularly:
-   - AI-related terms and products (e.g., "ChatGPT", "GPT-4", "Claude", "Gemini")
-   - Company names (e.g., "OpenAI", "Microsoft", "Google")
-   - Product names and technical terms
+1. Technical Term Validation & Standardization
+   - Identify and correct any misrecognized technical terms, especially:
+     * AI-related products (ChatGPT, GPT-4, Claude, Gemini, etc.)
+     * Company names (OpenAI, Microsoft, Google, etc.)
+     * Technical terminology and industry-specific jargon
    
-   Correction Guidelines:
-   - Identify and correct any speech recognition errors in product names
-   - Pay special attention to AI product names that might be misrecognized
-   - Ensure all technical terms match their official forms
+   Common AI Product Name Misrecognitions:
+   - ChatGPT might be misrecognized as:
+     * "Chat GPT", "Chad GPT", "Judge P.E.T.", "Jack GPT"
+   - Claude might appear as:
+     * "Cloud", "Clyde", "Crowd"
+   - GPT-4 variations:
+     * "GPT four", "GPT for", "GPS 4"
    
-2. Double Check Process:
-   After initial correction, perform a thorough verification:
-   a) Product Name Verification:
-      - Compare each AI product mention against a list of known official names
-      - Flag any suspicious variations for extra review
-      - Ensure consistency in product name usage throughout the text
-   
-   b) Context-based Validation:
-      - Analyze the surrounding context to confirm correct product identification
-      - Check if the usage aligns with the product's known capabilities
-      - Verify technical terms are used in appropriate contexts
-   
-   c) Final Quality Check:
-      - Review all corrections to ensure they maintain the original meaning
-      - Verify no valid technical terms were incorrectly modified
-      - Confirm all product names are in their official forms
+   Validation Process:
+   a) Compare against official product names and terminology
+   b) Check against known misrecognition patterns
+   c) Correct any ASR (Automatic Speech Recognition) errors
+   d) Standardize terminology across the content
+   e) Double-verify AI product names against official sources
 
-3. Summarize the Video Content:
-   - Identify the video type and key translation considerations
-   - Provide a detailed summary using the corrected terms
-   - Ensure all technical terms used in the summary are accurate and standardized
+2. Quality Assurance Protocol
+   Execute a three-stage verification process:
 
-4. Extract Important Terms:
-   - Identify and validate all major nouns and phrases
-   - For AI-related terms:
-     * Use standard, official names
-     * Verify against known AI products and companies
-   - For other technical terms:
-     * Ensure consistency with industry standards
-     * Remove any misrecognized or incorrect variations
+   Stage 1: Initial Verification
+   - Cross-reference product names with official sources
+   - Flag potential misrecognitions for review
+   - Ensure naming consistency throughout
+   - Special attention to AI product name variations
 
-Output Format:
-Return a JSON object in the original subtitle language with the following structure:
+   Stage 2: Contextual Analysis
+   - Evaluate term usage within surrounding context
+   - Verify technical accuracy of statements
+   - Validate product capabilities mentioned
+   - Check if AI product references align with known features
+
+   Stage 3: Final Review
+   - Confirm all corrections maintain original meaning
+   - Verify technical accuracy of modified content
+   - Ensure standardization of terminology
+   - Final AI product name validation
+
+3. Content Analysis & Summarization
+   Deliver a comprehensive analysis including:
+   - Video category and primary focus
+   - Key technical considerations
+   - Critical points and main arguments
+   - Technical complexity level
+   - AI tools and technologies mentioned
+
+4. Technical Term Extraction
+   Identify and categorize:
+   - Industry-standard terminology
+   - Product names and versions (with extra validation for AI products)
+   - Technical concepts and methodologies
+   - Domain-specific vocabulary
+
+Output Specification:
+Return a JSON object in the source language with the following structure:
 {
-    "summary": "A comprehensive overview using corrected terms",
+    "summary": "Comprehensive content overview with validated terminology",
     "terms": {
         "entities": [
-            // List of validated names, organizations, etc.
-            // Must use correct, official names
+            // List of validated proper nouns:
+            // - AI Product names (must match official names)
+            // - Company names
+            // - Person names
+            // - Organization names
         ],
         "keywords": [
-            // List of validated technical terms
-            // Must be industry-standard terminology
+            // List of technical terms:
+            // - Industry terminology
+            // - Technical concepts
+            // - Methodologies
+            // - Domain-specific vocabulary
         ]
     }
 }
 
-Validation Rules:
-1. All AI product names must match their official names
-2. Company names must be in their correct form
-3. Technical terms must be industry-standard
-4. Remove any terms that appear to be speech recognition errors
-5. Do not include misrecognized variations in either entities or keywords
+Validation Requirements:
+1. All AI product names must exactly match official documentation
+2. Company names must follow official branding
+3. Technical terms must align with industry standards
+4. ASR errors must be identified and corrected
+5. Terminology must be consistent throughout
+6. Each term must be relevant to the content domain
+7. Avoid including generic or non-technical terms
+8. AI product names must be verified against common misrecognition patterns
+9. Context must support the identified AI product names
 """
 
 TRANSLATE_PROMPT = """

@@ -82,10 +82,10 @@ class SubtitleTranslator:
                 need_remove_punctuation=False,
                 cjk_only=True
             )
-
+            
             subtitle_json = {str(k): v["original_subtitle"] for k, v in asr_data.to_json().items()}
             translate_result = translator.translate_multi_thread(subtitle_json,
-                                                            reflect=self.config["need_reflect"])
+                                                            reflect=reflect or self.config["need_reflect"])
 
             # 保存优化后的字幕
             for i, subtitle_text in translate_result["optimized_subtitles"].items():
@@ -114,7 +114,7 @@ class SubtitleTranslator:
 
             if not os.path.exists(output_file):
                 raise Exception("字幕翻译失败...")
-            logger.info(f"翻译完成! 文件已保存至: {output_file}")
+            logger.info(f"翻译后的字幕已保存至: {output_file}")
                 
         except Exception as e:
             logger.exception(f"翻译失败: {str(e)}")

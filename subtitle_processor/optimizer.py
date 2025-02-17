@@ -57,7 +57,7 @@ class SubtitleOptimizer:
         self.need_remove_punctuation = need_remove_punctuation
         self.cjk_only = cjk_only
         self.reflect = reflect
-
+        
         # 注册退出处理
         import atexit
         atexit.register(self.stop)
@@ -156,6 +156,7 @@ class SubtitleOptimizer:
 
     def _normal_translate(self, original_subtitle: Dict[int, str]):
         logger.info(f"[+]正在翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
+        # 让大模型直接处理校正和翻译，不需要预处理
         message = self._create_translate_message(original_subtitle)
         logger.debug(f"message: {message}")
         response = self.client.chat.completions.create(
@@ -202,7 +203,7 @@ class SubtitleOptimizer:
     def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
         input_content = f"correct the original subtitles, and translate them into {self.target_language}:\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
         if self.summary_content:
-            input_content += f"\nThe following is reference material related to subtitles, based on which the subtitles will be corrected, optimized, and translated:\n<prompt>{self.summary_content}</prompt>\n"
+            input_content += f"\nThe following is reference material related to subtitles, based on which the subtitles will be corrected, optimized, and translated. Pay special attention to the potential misrecognitions and use them along with context to make intelligent corrections:\n<prompt>{self.summary_content}</prompt>\n"
         if reflect:
             prompt = REFLECT_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)
         else:

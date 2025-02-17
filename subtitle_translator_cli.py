@@ -66,11 +66,6 @@ class SubtitleTranslator:
                                        num_threads=self.config["thread_num"], 
                                        max_word_count_cjk=self.config["max_word_count_cjk"], 
                                        max_word_count_english=self.config["max_word_count_english"])
-                asr_data.save(save_path=split_path)
-                if os.path.exists(split_path):
-                    logger.info(f"字幕断句完成，已保存至: {split_path}")
-                else:
-                    raise Exception("字幕断句失败...")
                 
             logger.info("正在使用%s总结字幕...", llm_model)
             summarizer = SubtitleSummarizer(model=llm_model)
@@ -92,10 +87,31 @@ class SubtitleTranslator:
             translate_result = translator.translate_multi_thread(subtitle_json,
                                                             reflect=self.config["need_reflect"])
 
-            # 替换翻译后的字幕
-            for i, subtitle_text in translate_result.items():
-                seg = asr_data.segments[int(i) - 1]
-                seg.text = subtitle_text
+            if self.config["need_reflect"]:
+                # 保存优化后的字幕
+                for i, subtitle_text in translate_result["optimized_subtitles"].items():
+                    seg = asr_data.segments[int(i) - 1]
+                    seg.text = subtitle_text
+                asr_data.save(save_path=split_path)
+                logger.info(f"优化后的字幕已保存至: {split_path}")
+
+                # 替换翻译后的字幕
+                for i, subtitle_text in translate_result["translated_subtitles"].items():
+                    seg = asr_data.segments[int(i) - 1]
+                    texts = subtitle_text.split("\n")
+                    if len(texts) > 1:
+                        seg.text = texts[1]  # 使用译文
+                    else:
+                        seg.text = texts[0]
+            else:
+                # 非反思翻译模式，直接使用翻译结果
+                for i, subtitle_text in translate_result.items():
+                    seg = asr_data.segments[int(i) - 1]
+                    texts = subtitle_text.split("\n")
+                    if len(texts) > 1:
+                        seg.text = texts[1]  # 使用译文
+                    else:
+                        seg.text = texts[0]
 
             # 保存字幕
             subtitle_layout = self.config["subtitle_layout"]

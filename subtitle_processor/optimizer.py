@@ -90,9 +90,21 @@ class SubtitleOptimizer:
 
         results = list(self.executor.map(process_chunk, chunks))
 
-        # 合并结果
-        translate_result = {k: v for result in results for k, v in result.items()}
-        return translate_result
+        if reflect:
+            # 合并反思翻译的结果
+            optimized_subtitles = {}
+            translated_subtitles = {}
+            for result in results:
+                optimized_subtitles.update(result["optimized_subtitles"])
+                translated_subtitles.update(result["translated_subtitles"])
+            return {
+                "optimized_subtitles": optimized_subtitles,
+                "translated_subtitles": translated_subtitles
+            }
+        else:
+            # 合并普通翻译的结果
+            translate_result = {k: v for result in results for k, v in result.items()}
+            return translate_result
     
     @retry.retry(tries=2)
     def translate(self, original_subtitle: Dict[int, str], reflect=False) -> Dict[int, str]:
@@ -134,7 +146,12 @@ class SubtitleOptimizer:
                     self.llm_result_logger.info(f"反思建议：{v['revise_suggestions']}")
                     self.llm_result_logger.info(f"翻译后字幕：{v['translation']}")
                     self.llm_result_logger.info(f"反思后字幕：{v['revised_translation']}")
-        return translated_subtitle
+        
+        # 返回优化后的字幕和翻译结果
+        return {
+            "optimized_subtitles": aligned_subtitle,
+            "translated_subtitles": translated_subtitle
+        }
 
     def _normal_translate(self, original_subtitle: Dict[int, str]):
         logger.info(f"[+]正在翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")

@@ -31,10 +31,10 @@ class SubtitleTranslator:
             "batch_size": 20,
             "max_word_count_cjk": 18,
             "max_word_count_english": 14,
-            "need_reflect": True
+            "need_reflect": False
         }
 
-    def translate(self, input_file: str, output_file: str, llm_model: str) -> None:
+    def translate(self, input_file: str, output_file: str, llm_model: str, reflect: bool) -> None:
         try:
             logger.info("字幕处理任务开始...")     
             # 获取API配置
@@ -87,31 +87,23 @@ class SubtitleTranslator:
             translate_result = translator.translate_multi_thread(subtitle_json,
                                                             reflect=self.config["need_reflect"])
 
-            if self.config["need_reflect"]:
-                # 保存优化后的字幕
-                for i, subtitle_text in translate_result["optimized_subtitles"].items():
-                    seg = asr_data.segments[int(i) - 1]
-                    seg.text = subtitle_text
-                asr_data.save(save_path=split_path)
-                logger.info(f"优化后的字幕已保存至: {split_path}")
+            # 保存优化后的字幕
+            for i, subtitle_text in translate_result["optimized_subtitles"].items():
+                seg = asr_data.segments[int(i) - 1]
+                seg.text = subtitle_text
+            asr_data.save(save_path=split_path)
+            if not os.path.exists(split_path):
+                raise Exception("字幕优化失败...")
+            logger.info(f"优化后的字幕已保存至: {split_path}")
 
-                # 替换翻译后的字幕
-                for i, subtitle_text in translate_result["translated_subtitles"].items():
-                    seg = asr_data.segments[int(i) - 1]
-                    texts = subtitle_text.split("\n")
-                    if len(texts) > 1:
-                        seg.text = texts[1]  # 使用译文
-                    else:
-                        seg.text = texts[0]
-            else:
-                # 非反思翻译模式，直接使用翻译结果
-                for i, subtitle_text in translate_result.items():
-                    seg = asr_data.segments[int(i) - 1]
-                    texts = subtitle_text.split("\n")
-                    if len(texts) > 1:
-                        seg.text = texts[1]  # 使用译文
-                    else:
-                        seg.text = texts[0]
+            # 替换翻译后的字幕
+            for i, subtitle_text in translate_result["translated_subtitles"].items():
+                seg = asr_data.segments[int(i) - 1]
+                texts = subtitle_text.split("\n")
+                if len(texts) > 1:
+                    seg.text = texts[1]  # 使用译文
+                else:
+                    seg.text = texts[0]
 
             # 保存字幕
             subtitle_layout = self.config["subtitle_layout"]
@@ -121,14 +113,11 @@ class SubtitleTranslator:
                 asr_data.save(save_path=output_file, ass_style=None, layout=subtitle_layout)
 
             if not os.path.exists(output_file):
-                raise Exception("字幕优化失败...")
-
-            logger.info("优化完成")
-            if os.path.exists(output_file):
-                logger.info(f"处理完成! 文件已保存至: {output_file}")
+                raise Exception("字幕翻译失败...")
+            logger.info(f"翻译完成! 文件已保存至: {output_file}")
                 
         except Exception as e:
-            logger.exception(f"优化失败: {str(e)}")
+            logger.exception(f"翻译失败: {str(e)}")
             raise
 
 
@@ -136,6 +125,7 @@ def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
     parser.add_argument('input', help='输入字幕文件路径')
     parser.add_argument('-m', '--llm_model', help='LLM模型', default=None)
+    parser.add_argument('-r', '--reflect', help='是否启用反思翻译', action='store_true')
     args = parser.parse_args()
     input_file = args.input
     output_file = input_file.replace('.srt', '_zh.srt')
@@ -150,7 +140,8 @@ def main():
         translator.translate(
             input_file=input_file,
             output_file=output_file,
-            llm_model=args.llm_model
+            llm_model=args.llm_model,
+            reflect=args.reflect
         )
     except Exception as e:
         logger.exception(f"发生错误: {str(e)}")

@@ -85,26 +85,27 @@ class SubtitleOptimizer:
                 result = self.translate(chunk, reflect)
             except Exception as e:
                 logger.error(f"翻译失败，使用单条翻译：{e}")
-                result = self.translate_single(chunk)
+                single_result = self.translate_single(chunk)
+                # 将单条翻译结果转换为新格式
+                return {
+                    "optimized_subtitles": chunk,  # 单条翻译不做优化，直接使用原文
+                    "translated_subtitles": single_result
+                }
             return result
 
         results = list(self.executor.map(process_chunk, chunks))
 
-        if reflect:
-            # 合并反思翻译的结果
-            optimized_subtitles = {}
-            translated_subtitles = {}
-            for result in results:
-                optimized_subtitles.update(result["optimized_subtitles"])
-                translated_subtitles.update(result["translated_subtitles"])
-            return {
-                "optimized_subtitles": optimized_subtitles,
-                "translated_subtitles": translated_subtitles
-            }
-        else:
-            # 合并普通翻译的结果
-            translate_result = {k: v for result in results for k, v in result.items()}
-            return translate_result
+        # 合并所有结果
+        optimized_subtitles = {}
+        translated_subtitles = {}
+        for result in results:
+            optimized_subtitles.update(result["optimized_subtitles"])
+            translated_subtitles.update(result["translated_subtitles"])
+        
+        return {
+            "optimized_subtitles": optimized_subtitles,
+            "translated_subtitles": translated_subtitles
+        }
     
     @retry.retry(tries=2)
     def translate(self, original_subtitle: Dict[int, str], reflect=False) -> Dict[int, str]:
@@ -164,23 +165,39 @@ class SubtitleOptimizer:
             temperature=0.7)
         response_content = json_repair.loads(response.choices[0].message.content)
         if len(response_content) != len(original_subtitle):
-            logger.info("===========start===========")
-            logger.info(f"original_subtitle: {original_subtitle}")
-            logger.info(f"len(original_subtitle): {len(original_subtitle)}")
-            logger.info(f"response: {response_content}")
-            logger.info(f"len(response_content): {len(response_content)}")
-            logger.info("===========end===========")
-
+            logger.info("===========翻译结果数量不一致===========")
+            logger.info(f"原始字幕: {original_subtitle}")
+            logger.info(f"字幕数量: {len(original_subtitle)}")
+            logger.info(f"翻译结果: {response_content}")
+            logger.info(f"翻译结果数量: {len(response_content)}")
+            
         assert isinstance(response_content, dict) and len(response_content) == len(original_subtitle), "翻译结果错误"
+        
+        # 提取优化后的字幕和翻译
+        optimized_text = {k: v["optimized_subtitle"] for k, v in response_content.items()}
+        aligned_subtitle = repair_subtitle(original_subtitle, optimized_text)  # 修复字幕对齐问题
+        
+        # 在 translations 中查找对应的翻译
+        translations = {item["optimized_subtitle"]: item["translation"] for item in response_content.values()}
+        
         translated_subtitle = {}
-        original_list = list(original_subtitle.values())
-        translated_list = list(response_content.values())
-        for i, key in enumerate(original_subtitle.keys()):
-            original_text = self.remove_punctuation(original_list[i])
-            translated_text = self.remove_punctuation(translated_list[i])
-            translated_subtitle[key] = f"{original_text}\n{translated_text}"
+        for k, v in aligned_subtitle.items():
+            original_text = self.remove_punctuation(v)
+            translated_text = self.remove_punctuation(translations.get(v, ' '))
+            translated_subtitle[k] = f"{original_text}\n{translated_text}"
 
-        return translated_subtitle
+        if self.llm_result_logger:
+            for k, v in response_content.items():
+                if original_subtitle[k] != v['optimized_subtitle']:
+                    self.llm_result_logger.info("==============优化字幕=========================")
+                    self.llm_result_logger.info(f"原始字幕：{original_subtitle[k]}")
+                    self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
+
+        # 返回优化后的字幕和翻译结果
+        return {
+            "optimized_subtitles": aligned_subtitle,
+            "translated_subtitles": translated_subtitle
+        }
 
     def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
         input_content = f"correct the original subtitles, and translate them into {self.target_language}:\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
@@ -196,7 +213,7 @@ class SubtitleOptimizer:
 
     def translate_single(self, original_subtitle: Dict[int, str]) -> Dict[int, str]:
         """单条字幕翻译，用于在批量翻译失败时的备选方案"""
-        translate_result = {}
+        translated_subtitle = {}
         for key, value in original_subtitle.items():
             try:
                 message = [{"role": "system",
@@ -209,12 +226,17 @@ class SubtitleOptimizer:
                 translate = response.choices[0].message.content.replace("\n", "")
                 original_text = self.remove_punctuation(value)
                 translated_text = self.remove_punctuation(translate)
-                translate_result[key] = f"{original_text}\n{translated_text}"
-                logger.info(f"单条翻译结果: {translate_result[key]}")
+                translated_subtitle[key] = f"{original_text}\n{translated_text}"
+                logger.info(f"单条翻译结果: {translated_subtitle[key]}")
             except Exception as e:
                 logger.error(f"单条翻译失败: {e}")
-                translate_result[key] = f"{value}\n "
-        return translate_result
+                translated_subtitle[key] = f"{value}\n "
+        
+        # 单条翻译不做优化，直接返回原文作为优化后的字幕
+        return {
+            "optimized_subtitles": original_subtitle,
+            "translated_subtitles": translated_subtitle
+        }
 
     def remove_punctuation(self, text: str) -> str:
         """

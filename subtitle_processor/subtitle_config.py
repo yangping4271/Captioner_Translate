@@ -148,6 +148,7 @@ Based on the corrected subtitles, translate them into [TargetLanguage] following
    - Retain all key terms, proper nouns, and abbreviations without translation.
    - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
    - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
+   - Consider surrounding subtitles for context.
 
 [3. Reference Material Integration]
 If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
@@ -237,7 +238,7 @@ Based on the corrected subtitles, translate them into [TargetLanguage] following
    - Retain all key terms, proper nouns, and abbreviations without translation.
    - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
    - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
-
+   - Consider surrounding subtitles for context.
 (b) Translation Revision Suggestions:
    - Focus ONLY on the current subtitle segment's translation quality
    - DO NOT suggest completing incomplete sentences or adding context from other segments

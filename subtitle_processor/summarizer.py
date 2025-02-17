@@ -30,7 +30,8 @@ class SubtitleSummarizer:
                 messages=[
                     {"role": "system", "content": SUMMARIZER_PROMPT},
                     {"role": "user", "content": f"summarize the video content:\n{subtitle_content}"}
-                ]
+                ],
+                temperature=0.5
             )
             return str(json_repair.loads(response.choices[0].message.content))
         except Exception as e:

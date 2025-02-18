@@ -36,7 +36,6 @@ class SubtitleOptimizer:
         batch_num: int = BATCH_SIZE,
         target_language: str = "简体中文",
         llm_result_logger: logging.Logger = logger,
-        need_remove_punctuation: bool = True,
         cjk_only: bool = True,
         reflect: bool = False
     ) -> None:
@@ -54,7 +53,6 @@ class SubtitleOptimizer:
         self.thread_num = thread_num
         self.executor = ThreadPoolExecutor(max_workers=thread_num)  # 创建类级别的线程池
         self.llm_result_logger = llm_result_logger
-        self.need_remove_punctuation = need_remove_punctuation
         self.cjk_only = cjk_only
         self.reflect = reflect
         
@@ -224,8 +222,7 @@ class SubtitleOptimizer:
         
         translated_subtitle = {}
         for k, v in aligned_subtitle.items():
-            original_text = self.remove_punctuation(v)
-            translated_text = self.remove_punctuation(translations.get(v, ' '))
+            translated_text = translations.get(v, ' ')
             translated_subtitle[k] = translated_text
 
         if self.llm_result_logger:
@@ -256,15 +253,7 @@ class SubtitleOptimizer:
             messages=message,
             temperature=0.7)
         response_content = json_repair.loads(response.choices[0].message.content)
-        if len(response_content) != len(original_subtitle):
-            logger.info("===========翻译结果数量不一致===========")
-            logger.info(f"原始字幕: {original_subtitle}")
-            logger.info(f"字幕数量: {len(original_subtitle)}")
-            logger.info(f"翻译结果: {response_content}")
-            logger.info(f"翻译结果数量: {len(response_content)}")
             
-        assert isinstance(response_content, dict) and len(response_content) == len(original_subtitle), "翻译结果错误"
-        
         # 提取优化后的字幕和翻译
         optimized_text = {k: v["optimized_subtitle"] for k, v in response_content.items()}
         aligned_subtitle = repair_subtitle(original_subtitle, optimized_text)  # 修复字幕对齐问题
@@ -274,7 +263,7 @@ class SubtitleOptimizer:
         
         translated_subtitle = {}
         for k, v in aligned_subtitle.items():
-            translated_text = self.remove_punctuation(translations.get(v, ' '))
+            translated_text = translations.get(v, ' ')
             translated_subtitle[k] = translated_text
 
         if self.llm_result_logger:
@@ -289,35 +278,6 @@ class SubtitleOptimizer:
             "optimized_subtitles": aligned_subtitle,
             "translated_subtitles": translated_subtitle
         }
-
-    def remove_punctuation(self, text: str) -> str:
-        """
-        移除字幕中的标点符号
-        """
-        cjk_only = self.cjk_only
-        need_remove_punctuation = self.need_remove_punctuation
-        def is_mainly_cjk(text: str) -> bool:
-            """
-            判断文本是否主要由中日韩文字组成
-            """
-            # 定义CJK字符的Unicode范围
-            cjk_patterns = [
-                r'[\u4e00-\u9fff]',           # 中日韩统一表意文字
-                r'[\u3040-\u309f]',           # 平假名
-                r'[\u30a0-\u30ff]',           # 片假名
-                r'[\uac00-\ud7af]',           # 韩文音节
-            ]
-            cjk_count = 0
-            for pattern in cjk_patterns:
-                cjk_count += len(re.findall(pattern, text))
-            total_chars = len(''.join(text.split()))
-            return cjk_count / total_chars > 0.4 if total_chars > 0 else False
-
-        punctuation = r'[,.!?;:，。！？；：、]'
-        if not need_remove_punctuation or (cjk_only and not is_mainly_cjk(text)):
-            return text
-        # 移除末尾标点符号
-        return re.sub(f'{punctuation}+$', '', text.strip())
 
 
 def repair_subtitle(dict1, dict2) -> Dict[int, str]:

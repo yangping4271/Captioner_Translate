@@ -1,3 +1,6 @@
+import dotenv
+dotenv.load_dotenv()
+
 import argparse
 import json
 import logging
@@ -8,23 +11,20 @@ from typing import Dict, List, Optional
 from subtitle_processor.optimizer import SubtitleOptimizer
 from subtitle_processor.summarizer import SubtitleSummarizer
 from subtitle_processor.spliter import merge_segments
-from subtitle_processor.config import SubtitleConfig, SRT_SUFFIX, OUTPUT_SUFFIX, EN_OUTPUT_SUFFIX
+from subtitle_processor.config import SubtitleConfig, SRT_SUFFIX, OUTPUT_SUFFIX, EN_OUTPUT_SUFFIX, get_default_config
 from bk_asr.ASRData import from_subtitle_file, ASRData, ASRDataSeg
 from utils.test_opanai import test_openai
 from utils.logger import setup_logger
-
-import dotenv
-dotenv.load_dotenv()
 
 # 配置日志
 logger = setup_logger("subtitle_translator_cli")
 
 class SubtitleTranslator:
     def __init__(self):
-        self.config = SubtitleConfig()
+        self.config = get_default_config()
         self.summarizer = SubtitleSummarizer(config=self.config)
 
-    def translate(self, input_file: str, output_file: str, llm_model: str, reflect: bool) -> None:
+    def translate(self, input_file: str, llm_model: str, reflect: bool) -> None:
         """翻译字幕文件"""
         try:
             logger.info("字幕处理任务开始...")     
@@ -49,7 +49,7 @@ class SubtitleTranslator:
             translate_result = self._translate_subtitles(asr_data, summarize_result, reflect)
             
             # 保存字幕
-            self._save_subtitles(asr_data, translate_result, input_file, output_file)
+            self._save_subtitles(asr_data, translate_result, input_file)
                 
         except Exception as e:
             logger.exception(f"翻译失败: {str(e)}")
@@ -97,48 +97,33 @@ class SubtitleTranslator:
             logger.error(f"翻译失败: {str(e)}")
             raise
 
-    def _save_subtitles(self, asr_data, translate_result: List[Dict], input_file: str, output_file: str) -> None:
-        """
-        保存翻译结果
-        """
-        # 创建输出目录
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-        # 构建文件路径
-        base_name = os.path.splitext(os.path.basename(input_file))[0]
-        en_path = os.path.join(os.path.dirname(output_file), f"{base_name}_optimized.srt")
-        zh_path = os.path.join(os.path.dirname(output_file), f"{base_name}_translated.srt")
-
-        # 保存优化后的英文字幕
-        optimized_subtitles = {item["id"]: item["optimized"] for item in translate_result}
-        self._save_srt_file(asr_data, optimized_subtitles, en_path, "优化")
-
-        # 保存翻译后的中文字幕
-        if any("revised_translation" in item for item in translate_result):
-            # 如果有反思翻译结果，使用反思后的翻译
-            translated_subtitles = {item["id"]: item["revised_translation"] for item in translate_result}
-        else:
-            # 否则使用普通翻译结果
-            translated_subtitles = {item["id"]: item["translation"] for item in translate_result}
-        self._save_srt_file(asr_data, translated_subtitles, zh_path, "翻译")
-
-    def _save_srt_file(self, asr_data: ASRData, subtitle_dict: Dict, 
+    def _save_srt_file(self, segments: List[ASRDataSeg], subtitle_dict: Dict[int, str], 
                        output_path: str, operation: str = "处理") -> None:
-        """通用的字幕保存方法"""
-        # 创建输出目录
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        """
+        通用的字幕保存方法
+        
+        Args:
+            segments: 字幕段落列表，包含时间戳信息
+            subtitle_dict: 字幕内容字典，key为段落编号，value为字幕文本
+            output_path: 输出文件路径
+            operation: 操作类型描述，用于日志
+        """
+        # 创建输出目录（如果不存在）
+        output_dir = os.path.dirname(output_path)
+        if output_dir:  # 只在有目录路径时创建
+            os.makedirs(output_dir, exist_ok=True)
 
         # 生成SRT格式的字幕内容
         srt_lines = []
-        logger.info(f"ASR数据段数: {len(asr_data.segments)}")
+        logger.info(f"字幕段落数: {len(segments)}")
         logger.info(f"字幕字典内容: {subtitle_dict}")
-        for i, subtitle_text in enumerate(asr_data.segments, 1):
+        for i, segment in enumerate(segments, 1):
             if i not in subtitle_dict:
                 logger.warning(f"字幕 {i} 不在字典中")
                 continue
             srt_lines.extend([
                 str(i),
-                subtitle_text.to_srt_ts(),
+                segment.to_srt_ts(),
                 subtitle_dict[i],
                 ""  # 空行分隔
             ])
@@ -153,29 +138,51 @@ class SubtitleTranslator:
             raise Exception(f"字幕{operation}失败...")
         logger.info(f"{operation}后的字幕已保存至: {output_path}")
 
+    def _save_subtitles(self, asr_data: ASRData, translate_result: List[Dict], input_file: str) -> None:
+        """
+        保存翻译结果
+        """
+        # 构建文件路径
+        input_path = Path(input_file)
+        base_name = input_path.stem
+        output_dir = input_path.parent
+        
+        # 构建输出文件路径
+        en_path = output_dir / f"{base_name}{EN_OUTPUT_SUFFIX}"
+        zh_path = output_dir / f"{base_name}{OUTPUT_SUFFIX}"
+
+        # 保存优化后的英文字幕
+        optimized_subtitles = {}
+        for item in translate_result:
+            optimized_subtitles[item["id"]] = item["optimized"]
+        self._save_srt_file(asr_data.segments, optimized_subtitles, str(en_path), "优化")
+
+        # 保存翻译后的中文字幕
+        translated_subtitles = {}
+        for item in translate_result:
+            if "revised_translation" in item:
+                # 如果有反思翻译结果，使用反思后的翻译
+                translated_subtitles[item["id"]] = item["revised_translation"]
+            else:
+                # 否则使用普通翻译结果
+                translated_subtitles[item["id"]] = item["translation"]
+        self._save_srt_file(asr_data.segments, translated_subtitles, str(zh_path), "翻译")
+
 
 def main():
     parser = argparse.ArgumentParser(description="翻译字幕文件")
     parser.add_argument("input_file", help="输入的字幕文件路径")
     parser.add_argument("-r", "--reflect", action="store_true", help="是否启用反思翻译")
-    parser.add_argument("-o", "--output_dir", default="output", help="输出目录路径")
     parser.add_argument("-m", "--llm_model", help="LLM模型", default=None)
     args = parser.parse_args()
 
     try:
-        # 创建输出目录
-        os.makedirs(args.output_dir, exist_ok=True)
-
-        # 构建输出文件路径
-        base_name = os.path.splitext(os.path.basename(args.input_file))[0]
-        output_file = os.path.join(args.output_dir, f"{base_name}.srt")
-
         # 初始化翻译器并开始翻译
         translator = SubtitleTranslator()
+        base_name = Path(args.input_file).stem
         print(f"\n=================== 正在翻译 {base_name} ===================\n")
         translator.translate(
             input_file=args.input_file,
-            output_file=output_file,
             llm_model=args.llm_model,
             reflect=args.reflect
         )

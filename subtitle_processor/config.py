@@ -41,5 +41,7 @@ SRT_SUFFIX = ".srt"
 OUTPUT_SUFFIX = "_zh.srt"
 EN_OUTPUT_SUFFIX = "_en.srt"
 
-# 创建默认配置实例
-default_config = SubtitleConfig() 
+# 延迟创建默认配置实例
+def get_default_config() -> SubtitleConfig:
+    """获取默认配置实例"""
+    return SubtitleConfig() 

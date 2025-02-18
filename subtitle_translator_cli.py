@@ -124,49 +124,37 @@ class SubtitleTranslator:
         """保存翻译结果"""
         # 保存优化后的英文字幕
         en_path = input_file.replace('.srt', '_en.srt')
-        self._save_optimized_subtitles(asr_data, translate_result["optimized_subtitles"], en_path)
+        self._save_srt_file(asr_data, translate_result["optimized_subtitles"], en_path, "优化")
         
         # 保存中文翻译字幕
-        self._save_translated_subtitles(asr_data, translate_result["translated_subtitles"]["translated_subtitles"], 
-                                      output_file)
+        self._save_srt_file(asr_data, translate_result["translated_subtitles"]["translated_subtitles"], 
+                           output_file, "翻译")
 
-    def _save_optimized_subtitles(self, asr_data: ASRData, optimized_subtitles: Dict, 
-                                 output_path: str) -> None:
-        """保存优化后的原文字幕"""
-        optimized_segments = []
+    def _save_srt_file(self, asr_data: ASRData, subtitle_dict: Dict, 
+                       output_path: str, operation: str = "处理") -> None:
+        """通用的字幕保存方法
+        
+        Args:
+            asr_data: 原始字幕数据
+            subtitle_dict: 要保存的字幕内容字典
+            output_path: 输出文件路径
+            operation: 操作类型，用于日志提示
+        """
+        segments = []
         for i, subtitle_text in enumerate(asr_data.segments, 1):
-            if str(i) not in optimized_subtitles:
+            if str(i) not in subtitle_dict:
                 continue
-            optimized_segments.append(ASRDataSeg(
-                text=optimized_subtitles[str(i)],
+            segments.append(ASRDataSeg(
+                text=subtitle_dict[str(i)],
                 start_time=subtitle_text.start_time,
                 end_time=subtitle_text.end_time
             ))
         
-        optimized_asr_data = ASRData(optimized_segments)
-        optimized_asr_data.save(save_path=output_path)
+        srt_data = ASRData(segments)
+        srt_data.save(save_path=output_path)
         if not os.path.exists(output_path):
-            raise Exception("字幕优化失败...")
-        logger.info(f"优化后的字幕已保存至: {output_path}")
-
-    def _save_translated_subtitles(self, asr_data: ASRData, translated_subtitles: Dict,
-                                 output_path: str) -> None:
-        """保存翻译后的字幕"""
-        translated_segments = []
-        for i, subtitle_text in enumerate(asr_data.segments, 1):
-            if str(i) not in translated_subtitles:
-                continue
-            translated_segments.append(ASRDataSeg(
-                text=translated_subtitles[str(i)],
-                start_time=subtitle_text.start_time,
-                end_time=subtitle_text.end_time
-            ))
-        
-        translated_asr_data = ASRData(translated_segments)
-        translated_asr_data.save(save_path=output_path)
-        if not os.path.exists(output_path):
-            raise Exception("字幕翻译失败...")
-        logger.info(f"翻译后的字幕已保存至: {output_path}")
+            raise Exception(f"字幕{operation}失败...")
+        logger.info(f"{operation}后的字幕已保存至: {output_path}")
 
 
 def main():

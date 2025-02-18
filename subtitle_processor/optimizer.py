@@ -169,6 +169,7 @@ class SubtitleOptimizer:
                 
                 translate = response.choices[0].message.content.strip()
                 translated_subtitle[key] = translate
+                logger.info(f"单条翻译原文: {value}")
                 logger.info(f"单条翻译结果: {translate}")
             except Exception as e:
                 logger.error(f"单条翻译失败: {e}")
@@ -247,7 +248,6 @@ class SubtitleOptimizer:
 
     def _normal_translate(self, original_subtitle: Dict[int, str]):
         logger.info(f"[+]正在翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
-        # 让大模型直接处理校正和翻译，不需要预处理
         message = self._create_translate_message(original_subtitle)
         logger.debug(f"message: {message}")
         response = self.client.chat.completions.create(
@@ -274,7 +274,6 @@ class SubtitleOptimizer:
         
         translated_subtitle = {}
         for k, v in aligned_subtitle.items():
-            original_text = self.remove_punctuation(v)
             translated_text = self.remove_punctuation(translations.get(v, ' '))
             translated_subtitle[k] = translated_text
 

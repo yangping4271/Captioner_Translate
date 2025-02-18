@@ -17,7 +17,7 @@ class SubtitleSummarizer:
         if not base_url or not api_key:
             raise ValueError("环境变量 OPENAI_BASE_URL 和 OPENAI_API_KEY 必须设置")
 
-        self.model = model
+        self.model = model or os.getenv('LLM_MODEL', 'gpt-3.5-turbo')
         self.client = OpenAI(base_url=base_url, api_key=api_key)
 
     def summarize(self, subtitle_content: str) -> str:

@@ -22,7 +22,7 @@ logger = setup_logger("subtitle_optimizer")
 
 BATCH_SIZE = 20
 MAX_THREADS = 10
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-3.5-turbo"
 
 
 class SubtitleOptimizer:
@@ -44,7 +44,7 @@ class SubtitleOptimizer:
         api_key = os.getenv('OPENAI_API_KEY')
         assert base_url and api_key, "环境变量 OPENAI_BASE_URL 和 OPENAI_API_KEY 必须设置"
 
-        self.model = model
+        self.model = model or os.getenv('LLM_MODEL', DEFAULT_MODEL)
         self.client = OpenAI(base_url=base_url, api_key=api_key)
 
         self.summary_content = summary_content
@@ -74,39 +74,130 @@ class SubtitleOptimizer:
             finally:
                 self.executor = None
 
-    def translate_multi_thread(self, subtitle_json: Dict[int, str],
-                               reflect: bool = False):
-        batch_num = self.batch_num
+    def translate_multi_thread(self, subtitle_json: Dict[int, str], reflect: bool = False):
+        """多线程批量翻译字幕"""
+        if reflect:
+            return self._batch_translate(subtitle_json, use_reflect=True)
+        
+        try:
+            return self._batch_translate(subtitle_json, use_reflect=False)
+        except Exception as e:
+            logger.error(f"批量翻译失败，使用单条翻译：{e}")
+            return self._translate_by_single(subtitle_json)
+
+    def _batch_translate(self, subtitle_json: Dict[int, str], use_reflect: bool = False) -> Dict:
+        """批量翻译字幕的核心方法"""
         items = list(subtitle_json.items())[:]
-        chunks = [dict(items[i:i + batch_num]) for i in range(0, len(items), batch_num)]
-
-        def process_chunk(chunk):
-            try:
-                result = self.translate(chunk, reflect)
-            except Exception as e:
-                logger.error(f"翻译失败，使用单条翻译：{e}")
-                single_result = self.translate_single(chunk)
-                # 将单条翻译结果转换为新格式
-                return {
-                    "optimized_subtitles": chunk,  # 单条翻译不做优化，直接使用原文
-                    "translated_subtitles": single_result
-                }
-            return result
-
-        results = list(self.executor.map(process_chunk, chunks))
-
-        # 合并所有结果
+        chunks = [dict(items[i:i + self.batch_num]) 
+                 for i in range(0, len(items), self.batch_num)]
+        
+        # 创建翻译任务
+        futures = []
+        for chunk in chunks:
+            if use_reflect:
+                future = self.executor.submit(self._reflect_translate, chunk)
+            else:
+                future = self.executor.submit(self._normal_translate, chunk)
+            futures.append(future)
+        
+        # 收集结果
         optimized_subtitles = {}
         translated_subtitles = {}
-        for result in results:
-            optimized_subtitles.update(result["optimized_subtitles"])
-            translated_subtitles.update(result["translated_subtitles"])
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+                optimized_subtitles.update(result["optimized_subtitles"])
+                translated_subtitles.update(result["translated_subtitles"])
+            except Exception as e:
+                logger.error(f"批量翻译任务失败：{e}")
+                raise
         
         return {
             "optimized_subtitles": optimized_subtitles,
-            "translated_subtitles": translated_subtitles
+            "translated_subtitles": {
+                "translated_subtitles": translated_subtitles
+            }
         }
-    
+
+    def _translate_by_single(self, subtitle_json: Dict[int, str]) -> Dict:
+        """使用单条翻译模式处理字幕"""
+        items = list(subtitle_json.items())[:]
+        chunks = [dict(items[i:i + self.batch_num]) 
+                 for i in range(0, len(items), self.batch_num)]
+        
+        # 创建翻译任务
+        futures = []
+        for chunk in chunks:
+            future = self.executor.submit(self._translate_chunk_by_single, chunk)
+            futures.append(future)
+        
+        # 收集结果
+        optimized_subtitles = {}
+        translated_subtitles = {}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+                optimized_subtitles.update(result["optimized_subtitles"])
+                translated_subtitles.update(result["translated_subtitles"])
+            except Exception as e:
+                logger.error(f"单条翻译任务失败：{e}")
+                raise
+        
+        # 确保返回格式与批量翻译一致
+        return {
+            "optimized_subtitles": optimized_subtitles,
+            "translated_subtitles": {
+                "translated_subtitles": translated_subtitles
+            }
+        }
+
+    @retry.retry(tries=2)
+    def _translate_chunk_by_single(self, subtitle_chunk: Dict[int, str]) -> Dict:
+        """单条翻译模式的核心方法"""
+        translated_subtitle = {}
+        message = [{"role": "system",
+                   "content": SINGLE_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)}]
+        
+        for key, value in subtitle_chunk.items():
+            try:
+                message.append({"role": "user", "content": value})
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    stream=False,
+                    messages=message)
+                message.pop()
+                
+                translate = response.choices[0].message.content.strip()
+                translated_subtitle[key] = f"{value}\n{translate}"
+                logger.info(f"单条翻译结果: {translated_subtitle[key]}")
+            except Exception as e:
+                logger.error(f"单条翻译失败: {e}")
+                translated_subtitle[key] = f"{value}\n "
+        
+        return {
+            "optimized_subtitles": subtitle_chunk,
+            "translated_subtitles": translated_subtitle
+        }
+
+    def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
+        """创建翻译提示消息"""
+        input_content = (f"correct the original subtitles, and translate them into {self.target_language}:"
+                        f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
+        
+        if self.summary_content:
+            input_content += (f"\nThe following is reference material related to subtitles, based on which "
+                            f"the subtitles will be corrected, optimized, and translated. Pay special attention "
+                            f"to the potential misrecognitions and use them along with context to make intelligent "
+                            f"corrections:\n<prompt>{self.summary_content}</prompt>\n")
+        
+        prompt = REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT
+        prompt = prompt.replace("[TargetLanguage]", self.target_language)
+        
+        return [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": input_content}
+        ]
+
     @retry.retry(tries=2)
     def translate(self, original_subtitle: Dict[int, str], reflect=False) -> Dict[int, str]:
         """优化并翻译给定的字幕。"""
@@ -197,45 +288,6 @@ class SubtitleOptimizer:
         # 返回优化后的字幕和翻译结果
         return {
             "optimized_subtitles": aligned_subtitle,
-            "translated_subtitles": translated_subtitle
-        }
-
-    def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
-        input_content = f"correct the original subtitles, and translate them into {self.target_language}:\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
-        if self.summary_content:
-            input_content += f"\nThe following is reference material related to subtitles, based on which the subtitles will be corrected, optimized, and translated. Pay special attention to the potential misrecognitions and use them along with context to make intelligent corrections:\n<prompt>{self.summary_content}</prompt>\n"
-        if reflect:
-            prompt = REFLECT_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)
-        else:
-            prompt = TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)
-        message = [{"role": "system", "content": prompt},
-                   {"role": "user", "content": input_content}]
-        return message
-
-    def translate_single(self, original_subtitle: Dict[int, str]) -> Dict[int, str]:
-        """单条字幕翻译，用于在批量翻译失败时的备选方案"""
-        translated_subtitle = {}
-        for key, value in original_subtitle.items():
-            try:
-                message = [{"role": "system",
-                            "content": SINGLE_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)},
-                           {"role": "user", "content": value}]
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    stream=False,
-                    messages=message)
-                translate = response.choices[0].message.content.replace("\n", "")
-                original_text = self.remove_punctuation(value)
-                translated_text = self.remove_punctuation(translate)
-                translated_subtitle[key] = f"{original_text}\n{translated_text}"
-                logger.info(f"单条翻译结果: {translated_subtitle[key]}")
-            except Exception as e:
-                logger.error(f"单条翻译失败: {e}")
-                translated_subtitle[key] = f"{value}\n "
-        
-        # 单条翻译不做优化，直接返回原文作为优化后的字幕
-        return {
-            "optimized_subtitles": original_subtitle,
             "translated_subtitles": translated_subtitle
         }
 

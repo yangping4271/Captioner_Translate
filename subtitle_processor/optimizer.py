@@ -3,17 +3,19 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 import re
-from typing import Dict
+from typing import Dict, Optional, List
 import concurrent.futures
+import json
 
 import retry
 from openai import OpenAI
 
-from .subtitle_config import (
+from .prompts import (
     TRANSLATE_PROMPT,
     REFLECT_TRANSLATE_PROMPT,
     SINGLE_TRANSLATE_PROMPT
 )
+from .config import SubtitleConfig
 from subtitle_processor.aligner import SubtitleAligner
 from utils import json_repair
 from utils.logger import setup_logger
@@ -30,35 +32,28 @@ class SubtitleOptimizer:
 
     def __init__(
         self,
-        model: str = DEFAULT_MODEL,
-        summary_content: str = "",
-        thread_num: int = MAX_THREADS,
-        batch_num: int = BATCH_SIZE,
-        target_language: str = "简体中文",
-        llm_result_logger: logging.Logger = logger,
-        cjk_only: bool = True,
-        reflect: bool = False
-    ) -> None:
-        base_url = os.getenv('OPENAI_BASE_URL')
-        api_key = os.getenv('OPENAI_API_KEY')
-        assert base_url and api_key, "环境变量 OPENAI_BASE_URL 和 OPENAI_API_KEY 必须设置"
+        config: Optional[SubtitleConfig] = None,
+        need_reflect: bool = False
+    ):
+        self.config = config or SubtitleConfig()
+        self.need_reflect = need_reflect
+        self.client = OpenAI(
+            base_url=self.config.openai_base_url,
+            api_key=self.config.openai_api_key
+        )
+        self.thread_num = self.config.thread_num
+        self.batch_num = self.config.batch_size
 
-        self.model = model or os.getenv('LLM_MODEL', DEFAULT_MODEL)
-        self.client = OpenAI(base_url=base_url, api_key=api_key)
-
-        self.summary_content = summary_content
-        self.prompt = TRANSLATE_PROMPT
-        self.target_language = target_language
-        self.batch_num = batch_num
-        self.thread_num = thread_num
-        self.executor = ThreadPoolExecutor(max_workers=thread_num)  # 创建类级别的线程池
-        self.llm_result_logger = llm_result_logger
-        self.cjk_only = cjk_only
-        self.reflect = reflect
-        
-        # 注册退出处理
-        import atexit
-        atexit.register(self.stop)
+    def translate(self, asr_data, summary_content: Dict) -> List[Dict]:
+        """
+        翻译字幕
+        """
+        subtitle_json = {str(k): v["original_subtitle"] 
+                        for k, v in asr_data.to_json().items()}
+        if self.need_reflect:
+            return self._reflect_translate(subtitle_json, summary_content)
+        else:
+            return self._translate(subtitle_json, summary_content)
 
     def stop(self):
         """优雅关闭线程池"""
@@ -95,7 +90,7 @@ class SubtitleOptimizer:
             if use_reflect:
                 future = self.executor.submit(self._reflect_translate, chunk)
             else:
-                future = self.executor.submit(self._normal_translate, chunk)
+                future = self.executor.submit(self._translate, chunk)
             futures.append(future)
         
         # 收集结果
@@ -154,13 +149,13 @@ class SubtitleOptimizer:
         """单条翻译模式的核心方法"""
         translated_subtitle = {}
         message = [{"role": "system",
-                   "content": SINGLE_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.target_language)}]
+                   "content": SINGLE_TRANSLATE_PROMPT.replace("[TargetLanguage]", self.config.target_language)}]
         
         for key, value in subtitle_chunk.items():
             try:
                 message.append({"role": "user", "content": value})
                 response = self.client.chat.completions.create(
-                    model=self.model,
+                    model=self.config.model,
                     stream=False,
                     messages=message)
                 message.pop()
@@ -178,148 +173,112 @@ class SubtitleOptimizer:
             "translated_subtitles": translated_subtitle
         }
 
-    def _create_translate_message(self, original_subtitle: Dict[int, str], reflect=False):
+    def _create_translate_message(self, original_subtitle: Dict[str, str], summary_content: Dict, reflect=False):
         """创建翻译提示消息"""
-        input_content = (f"correct the original subtitles, and translate them into {self.target_language}:"
+        input_content = (f"correct the original subtitles, and translate them into {self.config.target_language}:"
                         f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
-        
-        if self.summary_content:
+
+        if summary_content:
             input_content += (f"\nThe following is reference material related to subtitles, based on which "
                             f"the subtitles will be corrected, optimized, and translated. Pay special attention "
                             f"to the potential misrecognitions and use them along with context to make intelligent "
-                            f"corrections:\n<prompt>{self.summary_content}</prompt>\n")
-        
+                            f"corrections:\n<prompt>{summary_content}</prompt>\n")
+
         prompt = REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT
-        prompt = prompt.replace("[TargetLanguage]", self.target_language)
-        
+        prompt = prompt.replace("[TargetLanguage]", self.config.target_language)
+
         return [
             {"role": "system", "content": prompt},
             {"role": "user", "content": input_content}
         ]
 
-    @retry.retry(tries=2)
-    def translate(self, original_subtitle: Dict[int, str], reflect=False) -> Dict[int, str]:
-        """优化并翻译给定的字幕。"""
-        if reflect:
-            return self._reflect_translate(original_subtitle)
-        else:
-            return self._normal_translate(original_subtitle)
-
-    def _reflect_translate(self, original_subtitle: Dict[int, str]):
-        logger.info(f"[+]正在反思翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
-        message = self._create_translate_message(original_subtitle, reflect=True)
+    def _reflect_translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
+        """
+        反思翻译字幕
+        """
+        subtitle_keys = sorted(map(int, original_subtitle.keys()))
+        logger.info(f"[+]正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        message = self._create_translate_message(original_subtitle, summary_content, reflect=True)
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.config.llm_model,
             stream=False,
             messages=message,
-            temperature=0.7)
-        response_content = json_repair.loads(response.choices[0].message.content)
-        # print(response_content)
-        optimized_text = {k: v["optimized_subtitle"] for k, v in response_content.items()}  # 字幕文本
-        aligned_subtitle = repair_subtitle(original_subtitle, optimized_text)  # 修复字幕对齐问题
-        # 在 translations 中查找对应的翻译  文本-翻译 映射
-        translations = {item["optimized_subtitle"]: item["revised_translation"] for item in response_content.values()}
-        
-        translated_subtitle = {}
-        for k, v in aligned_subtitle.items():
-            translated_text = translations.get(v, ' ')
-            translated_subtitle[k] = translated_text
+            temperature=0.7
+        )
+        try:
+            response_content = json.loads(response.choices[0].message.content)
+        except json.JSONDecodeError:
+            logger.error("解析JSON失败，尝试修复")
+            content = response.choices[0].message.content
+            response_content = json_repair.loads(content)
 
-        if self.llm_result_logger:
-            for k, v in response_content.items():
-                if original_subtitle[k] != v['optimized_subtitle']  :
-                    self.llm_result_logger.info("==============优化字幕=========================")
-                    self.llm_result_logger.info(f"原始字幕：{original_subtitle[k]}")
-                    self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
-                if v['translation'] != v['revised_translation']:
-                    self.llm_result_logger.info("==============反思翻译=========================")
-                    self.llm_result_logger.info(f"反思建议：{v['revise_suggestions']}")
-                    self.llm_result_logger.info(f"翻译后字幕：{v['translation']}")
-                    self.llm_result_logger.info(f"反思后字幕：{v['revised_translation']}")
-        
-        # 返回优化后的字幕和翻译结果
-        return {
-            "optimized_subtitles": aligned_subtitle,
-            "translated_subtitles": translated_subtitle
-        }
+        translated_subtitle = []
+        for k, v in response_content.items():
+            k = int(k)  # 将字符串键转换为整数
+            translated_text = {
+                "id": k,
+                "original": original_subtitle[str(k)],
+                "optimized": v["optimized_subtitle"],
+                "translation": v["translation"],
+                "revised_translation": v["revised_translation"],
+                "revise_suggestions": v["revise_suggestions"]
+            }
+            translated_subtitle.append(translated_text)
 
-    def _normal_translate(self, original_subtitle: Dict[int, str]):
-        logger.info(f"[+]正在翻译字幕：{next(iter(original_subtitle))} - {next(reversed(original_subtitle))}")
-        message = self._create_translate_message(original_subtitle)
-        logger.debug(f"message: {message}")
+            # 记录优化和翻译的变化
+            if translated_text["original"] != translated_text["optimized"]:
+                logger.info("==============优化字幕=========================")
+                logger.info(f"原始字幕：{translated_text['original']}")
+                logger.info(f"优化字幕：{translated_text['optimized']}")
+            if translated_text["translation"] != translated_text["revised_translation"]:
+                logger.info("==============反思翻译=========================")
+                logger.info(f"反思建议：{translated_text['revise_suggestions']}")
+                logger.info(f"翻译后字幕：{translated_text['translation']}")
+                logger.info(f"反思后字幕：{translated_text['revised_translation']}")
+
+        return translated_subtitle
+
+    def _translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
+        """
+        翻译字幕
+        """
+        subtitle_keys = sorted(map(int, original_subtitle.keys()))
+        logger.info(f"[+]正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        message = self._create_translate_message(original_subtitle, summary_content, reflect=False)
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.config.llm_model,
             stream=False,
             messages=message,
-            temperature=0.7)
-        response_content = json_repair.loads(response.choices[0].message.content)
-            
-        # 提取优化后的字幕和翻译
-        optimized_text = {k: v["optimized_subtitle"] for k, v in response_content.items()}
-        aligned_subtitle = repair_subtitle(original_subtitle, optimized_text)  # 修复字幕对齐问题
-        
-        # 在 translations 中查找对应的翻译
-        translations = {item["optimized_subtitle"]: item["translation"] for item in response_content.values()}
-        
-        translated_subtitle = {}
-        for k, v in aligned_subtitle.items():
-            translated_text = translations.get(v, ' ')
-            translated_subtitle[k] = translated_text
+            temperature=0.7
+        )
+        try:
+            response_content = json.loads(response.choices[0].message.content)
+        except json.JSONDecodeError:
+            logger.error("解析JSON失败，尝试修复")
+            content = response.choices[0].message.content
+            response_content = json_repair.loads(content)
 
-        if self.llm_result_logger:
-            for k, v in response_content.items():
-                if original_subtitle[k] != v['optimized_subtitle']:
-                    self.llm_result_logger.info("==============优化字幕=========================")
-                    self.llm_result_logger.info(f"原始字幕：{original_subtitle[k]}")
-                    self.llm_result_logger.info(f"优化字幕：{v['optimized_subtitle']}")
+        translated_subtitle = []
+        for k, v in response_content.items():
+            k = int(k)  # 将字符串键转换为整数
+            translated_text = {
+                "id": k,
+                "original": original_subtitle[str(k)],
+                "optimized": v["optimized_subtitle"],
+                "translation": v["translation"]
+            }
+            translated_subtitle.append(translated_text)
 
-        # 返回优化后的字幕和翻译结果
-        return {
-            "optimized_subtitles": aligned_subtitle,
-            "translated_subtitles": translated_subtitle
-        }
+            # 记录优化的变化
+            if translated_text["original"] != translated_text["optimized"]:
+                logger.info("==============优化字幕=========================")
+                logger.info(f"原始字幕：{translated_text['original']}")
+                logger.info(f"优化字幕：{translated_text['optimized']}")
 
-
-def repair_subtitle(dict1, dict2) -> Dict[int, str]:
-    list1 = list(dict1.values())
-    list2 = list(dict2.values())
-    text_aligner = SubtitleAligner()
-    aligned_source, aligned_target = text_aligner.align_texts(list1, list2)
-
-    assert len(aligned_source) == len(aligned_target), "对齐后字幕长度不一致"
-    # 验证是否匹配
-    similar_list = calculate_similarity_list(aligned_source, aligned_target)
-    if similar_list.count(True) / len(similar_list) >= 0.89:
-        # logger.info(f"修复成功！序列匹配相似度：{similar_list.count(True) / len(similar_list):.2f}")
-        start_id = next(iter(dict1.keys()))
-        modify_dict = {str(int(start_id) + i): value for i, value in enumerate(aligned_target)}
-        return modify_dict
-    else:
-        logger.error(f"修复失败！相似度：{similar_list.count(True) / len(similar_list):.2f}")
-        logger.error(f"源字幕：{list1}")
-        logger.error(f"目标字幕：{list2}")
-        raise ValueError("Fail to repair.")
-
-
-def is_similar(text1, text2, threshold=0.4):
-    similarity = difflib.SequenceMatcher(None, text1, text2).ratio()
-    return similarity >= threshold
-
-
-def calculate_similarity_list(list1, list2, threshold=0.5):
-    max_len = min(len(list1), len(list2))
-    similar_list = [False] * max_len  # 初始化相似性列表
-
-    for i in range(max_len):
-        similar_list[i] = is_similar(list1[i], list2[i], threshold)
-
-    return similar_list
+        return translated_subtitle
 
 
 if __name__ == "__main__":
-    # os.environ['OPENAI_BASE_URL'] = 'https://api.gptgod.online/v1'
-    # os.environ['OPENAI_API_KEY'] = 'sk-4StuHHm6Z1q0VcPHdPTUBdmKMsHW9JNZKe4jV7pJikBsGRuj'
-    # MODEL = "gpt-4o-mini"
     os.environ['OPENAI_BASE_URL'] = 'https://api.turboai.one/v1'
     os.environ['OPENAI_API_KEY'] = 'sk-ZOCYCz5kexAS3X8JD3A33a5eB20f486eA26896798055F2C5'
     MODEL = "gpt-4o-mini"

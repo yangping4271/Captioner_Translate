@@ -1,13 +1,16 @@
+import logging
+import os
 import re
-from typing import List
+from typing import List, Dict
 
-import openai
+from openai import OpenAI
 import retry
 
-from subtitle_processor.subtitle_config import SPLIT_SYSTEM_PROMPT
+from .prompts import SPLIT_SYSTEM_PROMPT
+from .config import SubtitleConfig
 from utils.logger import setup_logger
 
-logger = setup_logger("split_by_llm")
+logger = setup_logger("subtitle_spliter")
 
 MAX_WORD_COUNT = 15  # 英文单词或中文字符的最大数量
 
@@ -47,7 +50,7 @@ def split_by_llm_retry(text: str,
     user_prompt = f"Please use multiple <br> tags to separate the following sentence:\n{text}"
 
     # 初始化OpenAI客户端
-    client = openai.OpenAI()
+    client = OpenAI()
     response = client.chat.completions.create(
         model=model,
         messages=[

@@ -1,8 +1,11 @@
+import logging
 import os
+from typing import List, Dict, Optional
+import json
 
 from openai import OpenAI
-
-from subtitle_processor.subtitle_config import SUMMARIZER_PROMPT
+from .prompts import SUMMARIZER_PROMPT
+from .config import SubtitleConfig
 from utils import json_repair
 from utils.logger import setup_logger
 
@@ -10,33 +13,38 @@ logger = setup_logger("subtitle_summarizer")
 
 
 class SubtitleSummarizer:
-    def __init__(self, model) -> None:
-        base_url = os.getenv('OPENAI_BASE_URL')
-        api_key = os.getenv('OPENAI_API_KEY')
+    def __init__(
+        self,
+        config: Optional[SubtitleConfig] = None
+    ):
+        self.config = config or SubtitleConfig()
+        self.client = OpenAI(
+            base_url=self.config.openai_base_url,
+            api_key=self.config.openai_api_key
+        )
 
-        if not base_url or not api_key:
-            raise ValueError("环境变量 OPENAI_BASE_URL 和 OPENAI_API_KEY 必须设置")
-
-        self.model = model or os.getenv('LLM_MODEL', 'gpt-3.5-turbo')
-        self.client = OpenAI(base_url=base_url, api_key=api_key)
-
-    def summarize(self, subtitle_content: str) -> str:
-        logger.info(f"开始摘要化字幕内容")
+    def summarize(self, subtitle_content: str) -> Dict:
+        """
+        总结字幕内容
+        """
+        logger.info("开始摘要化字幕内容")
+        message = [
+            {"role": "system", "content": SUMMARIZER_PROMPT},
+            {"role": "user", "content": subtitle_content}
+        ]
+        response = self.client.chat.completions.create(
+            model=self.config.llm_model,
+            stream=False,
+            messages=message
+        )
         try:
-            # subtitle_content = subtitle_content[:3000]
-            response = self.client.chat.completions.create(
-                model=self.model,
-                stream=False,
-                messages=[
-                    {"role": "system", "content": SUMMARIZER_PROMPT},
-                    {"role": "user", "content": f"summarize the video content:\n{subtitle_content}"}
-                ],
-                temperature=0.5
-            )
-            return str(json_repair.loads(response.choices[0].message.content))
-        except Exception as e:
-            logger.exception(f"摘要化字幕内容失败: {e}")
-            return ""
+            result = json.loads(response.choices[0].message.content)
+            return result
+        except json.JSONDecodeError:
+            logger.error("解析JSON失败，尝试修复")
+            content = response.choices[0].message.content
+            result = json_repair.loads(content)
+            return result
     
     
 

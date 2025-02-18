@@ -168,11 +168,11 @@ class SubtitleOptimizer:
                 message.pop()
                 
                 translate = response.choices[0].message.content.strip()
-                translated_subtitle[key] = f"{value}\n{translate}"
-                logger.info(f"单条翻译结果: {translated_subtitle[key]}")
+                translated_subtitle[key] = translate
+                logger.info(f"单条翻译结果: {translate}")
             except Exception as e:
                 logger.error(f"单条翻译失败: {e}")
-                translated_subtitle[key] = f"{value}\n "
+                translated_subtitle[key] = ""
         
         return {
             "optimized_subtitles": subtitle_chunk,
@@ -225,7 +225,7 @@ class SubtitleOptimizer:
         for k, v in aligned_subtitle.items():
             original_text = self.remove_punctuation(v)
             translated_text = self.remove_punctuation(translations.get(v, ' '))
-            translated_subtitle[k] = f"{original_text}\n{translated_text}"
+            translated_subtitle[k] = translated_text
 
         if self.llm_result_logger:
             for k, v in response_content.items():
@@ -276,7 +276,7 @@ class SubtitleOptimizer:
         for k, v in aligned_subtitle.items():
             original_text = self.remove_punctuation(v)
             translated_text = self.remove_punctuation(translations.get(v, ' '))
-            translated_subtitle[k] = f"{original_text}\n{translated_text}"
+            translated_subtitle[k] = translated_text
 
         if self.llm_result_logger:
             for k, v in response_content.items():

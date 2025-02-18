@@ -156,10 +156,8 @@ class SubtitleTranslator:
         for i, subtitle_text in enumerate(asr_data.segments, 1):
             if str(i) not in translated_subtitles:
                 continue
-            texts = translated_subtitles[str(i)].split("\n")
-            translated_text = texts[1] if len(texts) > 1 else texts[0]
             translated_segments.append(ASRDataSeg(
-                text=translated_text,
+                text=translated_subtitles[str(i)],
                 start_time=subtitle_text.start_time,
                 end_time=subtitle_text.end_time
             ))

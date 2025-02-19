@@ -234,40 +234,41 @@ These subtitles may contain errors, and you need to correct the original subtitl
 1. Errors due to similar pronunciations
 2. Terminology or proper noun errors
 
-[3. Reference Integration]
 If provided, please prioritize the following reference information:
-- Content analysis and domain classification
-- Error corrections and confidence levels
+- Optimization prompt
+- Content summary
 - Technical terminology list
 - Original correct subtitles
 
-[4. Subtitle Optimization]
-Please strictly follow these rules when correcting the original subtitles:
-- Only correct speech recognition errors while maintaining the original structure
-- Remove meaningless interjections
-- Maintain one-to-one correspondence
-- Preserve original meaning and technical accuracy
-- When provided with error_corrections list, prioritize these corrections:
-  * Apply corrections with 'High' confidence directly
-  * For 'Medium' or 'Low' confidence corrections, verify with context
-  * Use the corrected forms in the translation process
-  * Maintain consistency of corrections across all related subtitles
+[3. Subtitle Optimization (for optimized_subtitle)]
+Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
+- Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
+- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
+- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
+- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
+- If the sentence is correct, do not modify the original words, structure, and expressions.
+- Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
 
-[5. Translation Process]
-Based on the corrected subtitles, translate into [TargetLanguage] following these steps:
-   - Provide accurate translations that faithfully convey the original meaning
-   - Use natural expressions that conform to target language conventions
-   - Retain key terms and proper nouns
-   - Consider cultural context and domain-specific terminology
-   - Maintain contextual coherence
-   - Consider surrounding subtitles for context
+[4. Translation Process]
+Based on the corrected subtitles, translate them into [TargetLanguage] following these steps:
+   - Provide accurate translations that faithfully convey the original meaning.
+   - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
+   - Retain all key terms, proper nouns, and abbreviations without translation.
+   - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
+   - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
+   - Consider surrounding subtitles for context.
+
+[5. Reference Material Integration]
+If reference information is provided along with the subtitles (for example, a text containing a "summary" and "terms"), you must use this data to guide your output as follows:
+- For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
+- For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
 
 [6. Output Format]
-Return a pure JSON with the following structure for each subtitle:
+Return a pure JSON with the following structure for each subtitle (identified by a unique numeric key):
 {
   "1": {
-    "optimized_subtitle": "Corrected original subtitle text",
-    "translation": "Translation in [TargetLanguage]"
+    "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
+    "translation": "Translation of optimized_subtitle in [TargetLanguage]"
   },
   "2": { ... },
   ...
@@ -348,45 +349,50 @@ Address the following potential issues:
 2. Domain-specific terminology
 3. Technical terms and proper nouns
 
-[3. Reference Integration]
-Prioritize and integrate:
-- Content analysis and domain classification
-- Error corrections with confidence levels
+If provided, please prioritize the following reference information:
+- Optimization prompt
+- Content summary
 - Technical terminology list
 - Original correct subtitles
 
-[4. Translation Process]
+[1. Subtitle Optimization (for optimized_subtitle)]
+Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
+- Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
+- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
+- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
+- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
+- If the sentence is correct, do not modify the original words, structure, and expressions.
+- Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
 
-a) Initial Translation:
-   - Provide accurate and faithful translations
-   - Use natural target language expressions
-   - Preserve key terms and proper nouns
-   - Consider domain context and terminology
-   - Maintain subtitle coherence
-   - Reference surrounding context
+[2. Translation Process]
+Based on the corrected subtitles, translate them into [TargetLanguage] following these steps:
 
-b) Critical Analysis:
-   - Evaluate technical accuracy
-   - Check cultural appropriateness
-   - Assess terminology consistency
-   - Review expression naturalness
-   - Verify context preservation
-   - Consider domain-specific requirements
-   - Cross-reference with provided error_corrections:
-     * Verify all high-confidence corrections are properly applied
-     * Review if medium/low-confidence corrections were appropriately handled
-     * Check for any missed corrections in similar contexts
+(a) Translation:
+   - Provide accurate translations that faithfully convey the original meaning.
+   - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
+   - Retain all key terms, proper nouns, and abbreviations without translation.
+   - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
+   - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
+   - Consider surrounding subtitles for context.
+(b) Translation Revision Suggestions:
+   - Focus ONLY on the current subtitle segment's translation quality
+   - DO NOT suggest completing incomplete sentences or adding context from other segments
+   - Evaluate translation accuracy, terminology consistency, and cultural appropriateness
+   - Point out any awkward expressions or unclear translations within the current segment
+   - Suggest improvements for technical terms or industry-specific language if needed
 
-c) Reflection and Improvement:
-   - Identify potential issues
-   - Suggest specific improvements
-   - Consider alternative expressions
-   - Propose terminology refinements
-   - Recommend structural adjustments
-   - Address cultural nuances
+(c) Revised Translation:
+   - Provide an improved version of the translation based on the revision suggestions (no explanation needed).
 
-[5. Output Format]
-Return a JSON with the following structure for each subtitle:
+[3. Reference Material Integration]
+If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
+- For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
+- For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
+- For revise_suggestions: Evaluate the translation against the provided summary and terms, and offer specific suggestions to enhance clarity, cultural relevance, and technical accuracy within the current segment only.
+- For revised_translation: Provide a refined translation that incorporates the improvement suggestions based on the reference material.
+
+[4. Output Format]
+Return a pure JSON with the following structure for each subtitle (identified by a unique numeric key):
 {
   "1": {
     "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
@@ -411,6 +417,38 @@ Return a JSON with the following structure for each subtitle:
 - few-shot -> 少样本学习
 - multi-modal -> 多模态
 - fine-tuning -> 微调
+
+# EXAMPLE_INPUT
+Correct the original subtitles and translate them into Chinese: 
+{
+  "1": "This makes brainstorming and drafting", 
+  "2": "and iterating on the text much easier.",
+  "3": "where you can collaboratively edit and refine text or code together with Jack GPT."
+}
+
+# EXAMPLE_OUTPUT
+{
+  "1": {
+    "optimized_subtitle": "This makes brainstorming and drafting",
+    "translation": "这使得头脑风暴和草拟",
+    "revise_suggestions": "Consider using more natural Chinese expressions for 'brainstorming'",
+    "revised_translation": "这让头脑风暴和起草"
+  },
+  "2": {
+    "optimized_subtitle": "and iterating on the text much easier.",
+    "translation": "以及对文本进行迭代变得更容易",
+    "revise_suggestions": "The translation is accurate and natural",
+    "revised_translation": "以及对文本进行迭代变得更容易"
+  },
+  "3": {
+    "optimized_subtitle": "where you can collaboratively edit and refine text or code together with ChatGPT",
+    "translation": "你可以与ChatGPT一起协作编辑和优化文本或代码",
+    "revise_suggestions": "The term 'Jack GPT' has been corrected to 'ChatGPT'. The translation accurately reflects the collaborative nature of the tool",
+    "revised_translation": "你可以与ChatGPT一起协作编辑和优化文本或代码"
+  }
+}
+
+Please process the given subtitles according to these instructions and return the results in the specified JSON format.
 """
 
 SINGLE_TRANSLATE_PROMPT = """

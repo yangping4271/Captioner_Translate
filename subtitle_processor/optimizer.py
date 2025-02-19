@@ -1,11 +1,6 @@
-import difflib
-import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
-import re
 from typing import Dict, Optional, List
 import concurrent.futures
-import json
 
 import retry
 from openai import OpenAI
@@ -16,16 +11,10 @@ from .prompts import (
     SINGLE_TRANSLATE_PROMPT
 )
 from .config import SubtitleConfig
-from subtitle_processor.aligner import SubtitleAligner
 from utils import json_repair
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_optimizer")
-
-BATCH_SIZE = 20
-MAX_THREADS = 10
-DEFAULT_MODEL = "gpt-3.5-turbo"
-
 
 class SubtitleOptimizer:
     """A class for optimize and translating subtitles using OpenAI's API."""
@@ -112,13 +101,15 @@ class SubtitleOptimizer:
         # 收集结果
         optimized_subtitles = {}
         translated_subtitles = {}
-        for future in concurrent.futures.as_completed(futures):
+        total = len(futures)
+        for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
             try:
                 result = future.result()
                 for item in result:
                     k = str(item["id"])
                     optimized_subtitles[k] = item["optimized"]
                     translated_subtitles[k] = item["translation"]
+                logger.info(f"批量翻译进度: {i}/{total} 批次")
             except Exception as e:
                 logger.error(f"批量翻译任务失败：{e}")
                 raise
@@ -145,16 +136,18 @@ class SubtitleOptimizer:
         # 收集结果
         optimized_subtitles = {}
         translated_subtitles = {}
-        for future in concurrent.futures.as_completed(futures):
+        total = len(futures)
+        for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
             try:
                 result = future.result()
-                optimized_subtitles.update(result["optimized_subtitles"])
-                translated_subtitles.update(result["translated_subtitles"])
+                for k, v in result["optimized_subtitles"].items():
+                    optimized_subtitles[str(k)] = v
+                    translated_subtitles[str(k)] = result["translated_subtitles"][k]
+                logger.info(f"单条翻译进度: {i}/{total} 批次")
             except Exception as e:
                 logger.error(f"单条翻译任务失败：{e}")
                 raise
         
-        # 确保返回格式与批量翻译一致
         return {
             "optimized_subtitles": optimized_subtitles,
             "translated_subtitles": {
@@ -284,9 +277,3 @@ class SubtitleOptimizer:
                 logger.info(f"优化字幕：{translated_text['optimized']}")
 
         return translated_subtitle
-
-
-if __name__ == "__main__":
-    os.environ['OPENAI_BASE_URL'] = 'https://api.turboai.one/v1'
-    os.environ['OPENAI_API_KEY'] = 'sk-ZOCYCz5kexAS3X8JD3A33a5eB20f486eA26896798055F2C5'
-    MODEL = "gpt-4o-mini"

@@ -1,8 +1,4 @@
-import logging
-import os
-from typing import List, Dict, Optional
-import json
-
+from typing import Dict, Optional
 from openai import OpenAI
 from .prompts import SUMMARIZER_PROMPT
 from .config import SubtitleConfig
@@ -39,14 +35,3 @@ class SubtitleSummarizer:
         )
         result = json_repair.loads(response.choices[0].message.content)
         return result
-    
-    
-
-if __name__ == "__main__":
-    summarizer = SubtitleSummarizer()
-    example_subtitles = {0: '既然是想做并发编程', 1: '比如说肯定是想干嘛', 2: '开启多条线程来同时执行任务'}
-    example_subtitles = dict(list(example_subtitles.items())[:5])
-
-    content = "".join(example_subtitles.values())
-    result = summarizer.summarize(content)
-    print(result)

@@ -43,17 +43,33 @@ class SubtitleOptimizer:
         )
         self.thread_num = self.config.thread_num
         self.batch_num = self.config.batch_size
+        self.executor = ThreadPoolExecutor(max_workers=self.thread_num)
 
     def translate(self, asr_data, summary_content: Dict) -> List[Dict]:
         """
         翻译字幕
         """
-        subtitle_json = {str(k): v["original_subtitle"] 
-                        for k, v in asr_data.to_json().items()}
-        if self.need_reflect:
-            return self._reflect_translate(subtitle_json, summary_content)
-        else:
-            return self._translate(subtitle_json, summary_content)
+        try:
+            subtitle_json = {str(k): v["original_subtitle"] 
+                            for k, v in asr_data.to_json().items()}
+            
+            # 使用多线程批量翻译
+            result = self.translate_multi_thread(subtitle_json, self.need_reflect, summary_content)
+            
+            # 转换结果格式
+            translated_subtitle = []
+            for k, v in result["optimized_subtitles"].items():
+                translated_text = {
+                    "id": int(k),
+                    "original": subtitle_json[str(k)],
+                    "optimized": v,
+                    "translation": result["translated_subtitles"]["translated_subtitles"][k]
+                }
+                translated_subtitle.append(translated_text)
+            
+            return translated_subtitle
+        finally:
+            self.stop()  # 确保线程池被关闭
 
     def stop(self):
         """优雅关闭线程池"""
@@ -67,18 +83,18 @@ class SubtitleOptimizer:
             finally:
                 self.executor = None
 
-    def translate_multi_thread(self, subtitle_json: Dict[int, str], reflect: bool = False):
+    def translate_multi_thread(self, subtitle_json: Dict[int, str], reflect: bool = False, summary_content: Dict = None):
         """多线程批量翻译字幕"""
         if reflect:
-            return self._batch_translate(subtitle_json, use_reflect=True)
+            return self._batch_translate(subtitle_json, use_reflect=True, summary_content=summary_content)
         
         try:
-            return self._batch_translate(subtitle_json, use_reflect=False)
+            return self._batch_translate(subtitle_json, use_reflect=False, summary_content=summary_content)
         except Exception as e:
             logger.error(f"批量翻译失败，使用单条翻译：{e}")
             return self._translate_by_single(subtitle_json)
 
-    def _batch_translate(self, subtitle_json: Dict[int, str], use_reflect: bool = False) -> Dict:
+    def _batch_translate(self, subtitle_json: Dict[int, str], use_reflect: bool = False, summary_content: Dict = None) -> Dict:
         """批量翻译字幕的核心方法"""
         items = list(subtitle_json.items())[:]
         chunks = [dict(items[i:i + self.batch_num]) 
@@ -88,9 +104,9 @@ class SubtitleOptimizer:
         futures = []
         for chunk in chunks:
             if use_reflect:
-                future = self.executor.submit(self._reflect_translate, chunk)
+                future = self.executor.submit(self._reflect_translate, chunk, summary_content)
             else:
-                future = self.executor.submit(self._translate, chunk)
+                future = self.executor.submit(self._translate, chunk, summary_content)
             futures.append(future)
         
         # 收集结果
@@ -99,8 +115,10 @@ class SubtitleOptimizer:
         for future in concurrent.futures.as_completed(futures):
             try:
                 result = future.result()
-                optimized_subtitles.update(result["optimized_subtitles"])
-                translated_subtitles.update(result["translated_subtitles"])
+                for item in result:
+                    k = str(item["id"])
+                    optimized_subtitles[k] = item["optimized"]
+                    translated_subtitles[k] = item["translation"]
             except Exception as e:
                 logger.error(f"批量翻译任务失败：{e}")
                 raise
@@ -155,7 +173,7 @@ class SubtitleOptimizer:
             try:
                 message.append({"role": "user", "content": value})
                 response = self.client.chat.completions.create(
-                    model=self.config.model,
+                    model=self.config.llm_model,
                     stream=False,
                     messages=message)
                 message.pop()

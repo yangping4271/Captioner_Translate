@@ -34,8 +34,9 @@ class SubtitleTranslator:
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
-                logger.info(f"正在使用{self.config.llm_model}断句...")
-                asr_data = merge_segments(asr_data, model=self.config.llm_model, 
+                model = "gpt-4o-mini"
+                logger.info(f"正在使用{model}断句...")
+                asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 
                                        max_word_count_cjk=self.config.max_word_count_cjk, 
                                        max_word_count_english=self.config.max_word_count_english)

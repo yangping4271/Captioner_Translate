@@ -232,9 +232,7 @@ d) Product Demos:
 [2. Error Handling]
 These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
 1. Errors due to similar pronunciations
-2. Improper punctuation
-3. Incorrect capitalization of English words
-4. Terminology or proper noun errors
+2. Terminology or proper noun errors
 
 [3. Reference Integration]
 If provided, please prioritize the following reference information:
@@ -247,7 +245,6 @@ If provided, please prioritize the following reference information:
 Please strictly follow these rules when correcting the original subtitles:
 - Only correct speech recognition errors while maintaining the original structure
 - Remove meaningless interjections
-- Standardize punctuation and formatting
 - Maintain one-to-one correspondence
 - Preserve original meaning and technical accuracy
 - When provided with error_corrections list, prioritize these corrections:
@@ -348,9 +345,8 @@ d) Product Demos:
 [2. Error Analysis]
 Address the following potential issues:
 1. ASR misrecognition patterns
-2. Punctuation and formatting
-3. Capitalization and technical terms
-4. Domain-specific terminology
+2. Domain-specific terminology
+3. Technical terms and proper nouns
 
 [3. Reference Integration]
 Prioritize and integrate:

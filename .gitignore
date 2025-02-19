@@ -13,6 +13,7 @@ __pycache__/
 *.srt
 *.mp4
 *.exe
+*.ass
 
 # 输出和工作目录
 /output/

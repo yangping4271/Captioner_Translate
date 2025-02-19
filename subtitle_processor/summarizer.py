@@ -37,14 +37,8 @@ class SubtitleSummarizer:
             stream=False,
             messages=message
         )
-        try:
-            result = json.loads(response.choices[0].message.content)
-            return result
-        except json.JSONDecodeError:
-            logger.error("解析JSON失败，尝试修复")
-            content = response.choices[0].message.content
-            result = json_repair.loads(content)
-            return result
+        result = json_repair.loads(response.choices[0].message.content)
+        return result
     
     
 

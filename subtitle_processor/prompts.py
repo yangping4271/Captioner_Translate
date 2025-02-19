@@ -250,6 +250,11 @@ Please strictly follow these rules when correcting the original subtitles:
 - Standardize punctuation and formatting
 - Maintain one-to-one correspondence
 - Preserve original meaning and technical accuracy
+- When provided with error_corrections list, prioritize these corrections:
+  * Apply corrections with 'High' confidence directly
+  * For 'Medium' or 'Low' confidence corrections, verify with context
+  * Use the corrected forms in the translation process
+  * Maintain consistency of corrections across all related subtitles
 
 [5. Translation Process]
 Based on the corrected subtitles, translate into [TargetLanguage] following these steps:
@@ -371,6 +376,10 @@ b) Critical Analysis:
    - Review expression naturalness
    - Verify context preservation
    - Consider domain-specific requirements
+   - Cross-reference with provided error_corrections:
+     * Verify all high-confidence corrections are properly applied
+     * Review if medium/low-confidence corrections were appropriately handled
+     * Check for any missed corrections in similar contexts
 
 c) Reflection and Improvement:
    - Identify potential issues
@@ -384,15 +393,10 @@ c) Reflection and Improvement:
 Return a JSON with the following structure for each subtitle:
 {
   "1": {
-    "optimized_subtitle": "Corrected original text",
-    "translation": "Initial translation",
-    "revise_suggestions": {
-      "technical_accuracy": "Technical term verification",
-      "cultural_adaptation": "Cultural appropriateness analysis",
-      "expression_quality": "Natural expression evaluation",
-      "domain_specific": "Domain-related considerations"
-    },
-    "revised_translation": "Improved translation based on analysis"
+    "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
+    "translation": "Translation of optimized_subtitle in [TargetLanguage]",
+    "revise_suggestions": "Suggestions for improving translation quality ONLY for the current segment",
+    "revised_translation": "Final translation improved based on revision suggestions"
   },
   "2": { ... },
   ...

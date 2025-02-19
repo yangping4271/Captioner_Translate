@@ -115,8 +115,8 @@ class SubtitleTranslator:
 
         # 生成SRT格式的字幕内容
         srt_lines = []
-        logger.info(f"字幕段落数: {len(segments)}")
-        logger.info(f"字幕字典内容: {subtitle_dict}")
+        logger.debug(f"字幕段落数: {len(segments)}")
+        logger.debug(f"字幕字典内容: {subtitle_dict}")
         for i, segment in enumerate(segments, 1):
             if i not in subtitle_dict:
                 logger.warning(f"字幕 {i} 不在字典中")
@@ -130,7 +130,7 @@ class SubtitleTranslator:
 
         # 写入文件
         srt_content = "\n".join(srt_lines)
-        logger.info(f"生成的SRT内容:\n{srt_content}")
+        logger.debug(f"生成的SRT内容:\n{srt_content}")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
 

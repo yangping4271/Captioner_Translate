@@ -51,7 +51,7 @@ class SubtitleOptimizer:
                 translated_text = {
                     "id": int(k),
                     "original": subtitle_json[str(k)],
-                    "optimized": v,
+                    "optimized_subtitle": v,
                     "translation": result["translated_subtitles"]["translated_subtitles"][k]
                 }
                 translated_subtitle.append(translated_text)
@@ -107,7 +107,7 @@ class SubtitleOptimizer:
                 result = future.result()
                 for item in result:
                     k = str(item["id"])
-                    optimized_subtitles[k] = item["optimized"]
+                    optimized_subtitles[k] = item["optimized_subtitle"]
                     translated_subtitles[k] = item["translation"]
                 logger.info(f"批量翻译进度: {i}/{total} 批次")
             except Exception as e:
@@ -284,9 +284,7 @@ class SubtitleOptimizer:
 
     @retry.retry(tries=2)
     def _reflect_translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
-        """
-        反思翻译字幕
-        """
+        """反思翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         logger.info(f"[+]正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
         message = self._create_translate_message(original_subtitle, summary_content, reflect=True)
@@ -304,7 +302,7 @@ class SubtitleOptimizer:
             translated_text = {
                 "id": k,
                 "original": original_subtitle[str(k)],
-                "optimized": v["optimized_subtitle"],
+                "optimized_subtitle": v["optimized_subtitle"],
                 "translation": v["translation"],
                 "revised_translation": v["revised_translation"],
                 "revise_suggestions": v["revise_suggestions"]
@@ -312,10 +310,11 @@ class SubtitleOptimizer:
             translated_subtitle.append(translated_text)
 
             # 记录优化和翻译的变化
-            if translated_text["original"] != translated_text["optimized"]:
+            if translated_text["original"] != translated_text["optimized_subtitle"]:
                 logger.info("==============优化字幕=========================")
                 logger.info(f"原始字幕：{translated_text['original']}")
-                logger.info(f"优化字幕：{translated_text['optimized']}")
+                logger.info(f"优化字幕：{translated_text['optimized_subtitle']}")
+            
             if translated_text["translation"] != translated_text["revised_translation"]:
                 logger.info("==============反思翻译=========================")
                 logger.info(f"反思建议：{translated_text['revise_suggestions']}")
@@ -326,9 +325,7 @@ class SubtitleOptimizer:
 
     @retry.retry(tries=2)
     def _translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
-        """
-        翻译字幕
-        """
+        """翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         logger.info(f"[+]正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
         message = self._create_translate_message(original_subtitle, summary_content, reflect=False)
@@ -346,15 +343,15 @@ class SubtitleOptimizer:
             translated_text = {
                 "id": k,
                 "original": original_subtitle[str(k)],
-                "optimized": v["optimized_subtitle"],
+                "optimized_subtitle": v["optimized_subtitle"],
                 "translation": v["translation"]
             }
             translated_subtitle.append(translated_text)
 
             # 记录优化的变化
-            if translated_text["original"] != translated_text["optimized"]:
+            if translated_text["original"] != translated_text["optimized_subtitle"]:
                 logger.info("==============优化字幕=========================")
                 logger.info(f"原始字幕：{translated_text['original']}")
-                logger.info(f"优化字幕：{translated_text['optimized']}")
+                logger.info(f"优化字幕：{translated_text['optimized_subtitle']}")
 
         return translated_subtitle

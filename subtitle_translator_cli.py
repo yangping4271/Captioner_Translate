@@ -158,7 +158,7 @@ class SubtitleTranslator:
         # 保存优化后的英文字幕
         optimized_subtitles = {}
         for item in translate_result:
-            optimized_subtitles[item["id"]] = item["optimized"]
+            optimized_subtitles[item["id"]] = item["optimized_subtitle"]
         self._save_srt_file(asr_data.segments, optimized_subtitles, str(en_path), "优化")
 
         # 保存翻译后的中文字幕

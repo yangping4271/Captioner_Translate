@@ -203,6 +203,7 @@ class SubtitleOptimizer:
             {"role": "user", "content": input_content}
         ]
 
+    @retry.retry(tries=2)
     def _reflect_translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
         """
         反思翻译字幕
@@ -244,6 +245,7 @@ class SubtitleOptimizer:
 
         return translated_subtitle
 
+    @retry.retry(tries=2)
     def _translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
         """
         翻译字幕

@@ -54,6 +54,13 @@ class SubtitleOptimizer:
                     "optimized_subtitle": v,
                     "translation": result["translated_subtitles"]["translated_subtitles"][k]
                 }
+                # 如果是反思模式，添加反思相关的字段
+                if self.need_reflect and isinstance(result["translated_subtitles"]["translated_subtitles"][k], dict):
+                    translated_text.update({
+                        "revised_translation": result["translated_subtitles"]["translated_subtitles"][k].get("revised_translation"),
+                        "revise_suggestions": result["translated_subtitles"]["translated_subtitles"][k].get("revise_suggestions"),
+                        "translation": result["translated_subtitles"]["translated_subtitles"][k].get("translation")
+                    })
                 translated_subtitle.append(translated_text)
             
             return translated_subtitle
@@ -108,7 +115,15 @@ class SubtitleOptimizer:
                 for item in result:
                     k = str(item["id"])
                     optimized_subtitles[k] = item["optimized_subtitle"]
-                    translated_subtitles[k] = item["translation"]
+                    # 保存完整的翻译信息
+                    if "revised_translation" in item:
+                        translated_subtitles[k] = {
+                            "translation": item["translation"],
+                            "revised_translation": item["revised_translation"],
+                            "revise_suggestions": item["revise_suggestions"]
+                        }
+                    else:
+                        translated_subtitles[k] = item["translation"]
                 logger.info(f"批量翻译进度: {i}/{total} 批次")
             except Exception as e:
                 logger.error(f"批量翻译任务失败：{e}")

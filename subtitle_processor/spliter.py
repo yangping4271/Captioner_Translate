@@ -1,12 +1,10 @@
 import difflib
 import re
-import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
-from retry import retry
 
 from subtitle_processor.split_by_llm import split_by_llm
-from bk_asr.ASRData import ASRData, from_srt, ASRDataSeg
+from bk_asr.ASRData import ASRData, ASRDataSeg
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_spliter")

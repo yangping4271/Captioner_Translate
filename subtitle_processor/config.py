@@ -8,7 +8,7 @@ class SubtitleConfig:
     # API配置
     openai_base_url: str = os.getenv('OPENAI_BASE_URL', '')
     openai_api_key: str = os.getenv('OPENAI_API_KEY', '')
-    llm_model: str = os.getenv('LLM_MODEL', 'gpt-3.5-turbo')
+    llm_model: str = os.getenv('LLM_MODEL', 'gpt-4o-mini')
     
     # 处理配置
     target_language: str = "简体中文"

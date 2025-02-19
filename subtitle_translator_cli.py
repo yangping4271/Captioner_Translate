@@ -2,8 +2,6 @@ import dotenv
 dotenv.load_dotenv()
 
 import argparse
-import json
-import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Optional

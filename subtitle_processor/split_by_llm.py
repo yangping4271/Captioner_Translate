@@ -117,7 +117,7 @@ def split_by_llm_retry(text: str,
         word_count = count_words(text)
         expected_segments = word_count / max_word_count_cjk
         actual_segments = len(split_result)
-        logger.info(f"断句完成：预期段数 {expected_segments:.1f}，实际段数 {actual_segments}")
+        logger.debug(f"断句完成：预期段数 {expected_segments:.1f}，实际段数 {actual_segments}")
         
         if actual_segments < expected_segments * 0.9:
             raise Exception(f"断句数量不足：预期 {expected_segments:.1f}，实际 {actual_segments}")

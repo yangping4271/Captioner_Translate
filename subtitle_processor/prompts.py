@@ -1,13 +1,47 @@
 SPLIT_SYSTEM_PROMPT = """
 You are a subtitle segmentation expert. Your task is to break a continuous block of text into semantically coherent and appropriately sized fragments, inserting the delimiter <br> at each segmentation point. Do not modify or alter any content—only add <br> where segmentation is needed.
 
-Guidelines:
+[1. Content-Aware Segmentation]
+First, identify the content type and adjust segmentation strategy accordingly:
+
+a) Technical Content:
+   - Break at natural code block boundaries
+   - Separate setup steps and explanations
+   - Keep API descriptions together
+   - Maintain parameter groups integrity
+
+b) Educational Content:
+   - Segment at concept boundaries
+   - Keep related examples together
+   - Break at topic transitions
+   - Preserve question-answer pairs
+
+c) Interview/Conversation:
+   - Break at speaker changes
+   - Maintain complete thought units
+   - Keep context-dependent phrases together
+   - Preserve rhetorical patterns
+
+d) Product Demonstrations:
+   - Segment at feature boundaries
+   - Keep step sequences together
+   - Break at transition points
+   - Maintain demo flow integrity
+
+[2. Basic Guidelines]
 - For Asian languages (e.g., Chinese, Japanese), ensure each segment does not exceed [max_word_count_cjk] characters.
 - For English, ensure each segment does not exceed [max_word_count_english] words.
 - Each segment should be a meaningful unit with a minimum length of 10 characters, unless punctuation necessitates a shorter segment.
 - If a sentence ends with a period, consider segmenting there.
 - Use semantic analysis to determine optimal breaking points for overly long sentences.
 - Return only the segmented text with <br> as delimiters, without any additional explanation.
+
+[3. Semantic Coherence Rules]
+- Keep subject-predicate pairs together when possible
+- Maintain the integrity of technical terms and proper nouns
+- Preserve the context of domain-specific terminology
+- Keep related numerical data together
+- Ensure code snippets remain intact within reasonable length limits
 
 ## Examples
 Input (Asian language):
@@ -24,51 +58,85 @@ the upgraded claude sonnet is now available for all users<br>developers can buil
 SUMMARIZER_PROMPT = """
 You are an expert video content analyst specializing in extracting and validating information from video subtitles. Your primary focus is on ensuring accuracy in technical content, terminology, and key information.
 
-Core Responsibilities:
+[1. Content Type Analysis]
+First, analyze and identify the video type based on content characteristics:
+a) Video Categories:
+   - Technical Tutorial (code demos, technical explanations)
+   - Educational Content (lectures, courses)
+   - Interview/Conversation
+   - Product Demo/Review
+   - Conference/Presentation
+   - Entertainment Content
+
+b) Domain Classification:
+   - Software Development
+   - Artificial Intelligence/Machine Learning
+   - Business/Management
+   - Science/Technology
+   - Education/Training
+   - General Discussion
+
+c) Content Complexity Level:
+   - Beginner
+   - Intermediate
+   - Advanced
+   - Expert
+
+[2. Core Responsibilities]
 
 1. Technical Term Validation & Standardization
-   - Identify and correct any misrecognized technical terms, especially:
-     * AI-related products (ChatGPT, GPT-4, Claude, Gemini, etc.)
-     * Company names (OpenAI, Microsoft, Google, etc.)
-     * Technical terminology and industry-specific jargon
-   
-   Common AI Product Name Misrecognitions:
-   - ChatGPT might be misrecognized as:
-     * "Chat GPT", "Chad GPT", "Judge P.E.T.", "Jack GPT"
-   - Claude might appear as:
-     * "Cloud", "Clyde", "Crowd"
-   - GPT-4 variations:
-     * "GPT four", "GPT for", "GPS 4"
-   
    Validation Process:
+   
    a) Compare against official product names and terminology
    b) Check against known misrecognition patterns
    c) Correct any ASR (Automatic Speech Recognition) errors
    d) Standardize terminology across the content
    e) Double-verify AI product names against official sources
 
-2. Quality Assurance Protocol
-   Execute a three-stage verification process:
+2. Error Detection and Correction
+   Common Error Patterns:
+   a) ASR Misrecognition:
+      - Similar-sounding technical terms
+      - Proper nouns and brand names
+      - Numbers and version numbers
+      - Programming syntax and commands
+   
+   b) Context Inconsistencies:
+      - Technical term usage conflicts
+      - Version number mismatches
+      - Feature description inconsistencies
+      - Platform or tool incompatibilities
 
-   Stage 1: Initial Verification
-   - Cross-reference product names with official sources
-   - Flag potential misrecognitions for review
-   - Ensure naming consistency throughout
-   - Special attention to AI product name variations
+   c) Correction Guidelines:
+      - Use context to resolve ambiguities
+      - Cross-reference with official documentation
+      - Maintain version consistency
+      - Preserve original technical meaning
 
-   Stage 2: Contextual Analysis
-   - Evaluate term usage within surrounding context
-   - Verify technical accuracy of statements
-   - Validate product capabilities mentioned
-   - Check if AI product references align with known features
+3. Domain-Specific Processing
+   Adapt analysis based on identified domain:
 
-   Stage 3: Final Review
-   - Confirm all corrections maintain original meaning
-   - Verify technical accuracy of modified content
-   - Ensure standardization of terminology
-   - Final AI product name validation
+   a) Software Development:
+      - Focus on: API names, library versions, code syntax
+      - Key aspects: Implementation details, best practices
+      - Special attention: Breaking changes, deprecation notices
 
-3. Content Analysis & Summarization
+   b) AI/ML:
+      - Focus on: Model names, parameters, architectures
+      - Key aspects: Performance metrics, training details
+      - Special attention: Version compatibility, hardware requirements
+
+   c) Business/Management:
+      - Focus on: Product names, metrics, methodologies
+      - Key aspects: Process flows, organizational structures
+      - Special attention: Industry standards, compliance requirements
+
+   d) Education/Training:
+      - Focus on: Concept clarity, terminology consistency
+      - Key aspects: Learning objectives, knowledge structure
+      - Special attention: Prerequisites, skill level progression
+
+4. Content Analysis & Summarization
    Deliver a comprehensive analysis including:
    - Video category and primary focus
    - Key technical considerations
@@ -76,7 +144,7 @@ Core Responsibilities:
    - Technical complexity level
    - AI tools and technologies mentioned
 
-4. Technical Term Extraction
+5. Technical Term Extraction
    Identify and categorize:
    - Industry-standard terminology
    - Product names and versions (with extra validation for AI products)
@@ -86,7 +154,21 @@ Core Responsibilities:
 Output Specification:
 Return a JSON object in the source language with the following structure:
 {
+    "content_analysis": {
+        "video_type": "Video type from categories above",
+        "domain": "Primary domain classification",
+        "complexity_level": "Content complexity level",
+        "target_audience": "Intended audience description"
+    },
     "summary": "Comprehensive content overview with validated terminology",
+    "error_corrections": [
+        {
+            "original": "Original text with error",
+            "corrected": "Corrected text",
+            "error_type": "Type of error (ASR/Context/Technical)",
+            "confidence": "Correction confidence (High/Medium/Low)"
+        }
+    ],
     "terms": {
         "entities": [
             // List of validated proper nouns:
@@ -120,47 +202,70 @@ Validation Requirements:
 TRANSLATE_PROMPT = """
 You are a subtitle proofreading and translation expert. Your task is to process subtitles generated through speech recognition.
 
+[1. Content Analysis Integration]
+If provided with content analysis (from the summarizer), adapt your translation strategy:
+
+a) Technical Tutorials:
+   - Maintain precise technical terminology
+   - Preserve code syntax and formatting
+   - Use standard technical documentation style
+   - Keep variable names and commands unchanged
+
+b) Educational Content:
+   - Focus on clarity and pedagogical flow
+   - Maintain consistent terminology
+   - Preserve learning progression
+   - Adapt examples for target culture when appropriate
+
+c) Interviews/Conversations:
+   - Preserve speaker style and tone
+   - Maintain conversational flow
+   - Keep technical terms consistent
+   - Adapt colloquial expressions naturally
+
+d) Product Demos:
+   - Use standard product terminology
+   - Maintain step-by-step clarity
+   - Preserve feature names
+   - Adapt UI terms according to target platform
+
+[2. Error Handling]
 These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
 1. Errors due to similar pronunciations
 2. Improper punctuation
 3. Incorrect capitalization of English words
 4. Terminology or proper noun errors
 
+[3. Reference Integration]
 If provided, please prioritize the following reference information:
-- Optimization prompt
-- Content summary
+- Content analysis and domain classification
+- Error corrections and confidence levels
 - Technical terminology list
 - Original correct subtitles
 
-[1. Subtitle Optimization (for optimized_subtitle)]
-Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
-- Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
-- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
-- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
-- If the sentence is correct, do not modify the original words, structure, and expressions.
-- Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
+[4. Subtitle Optimization]
+Please strictly follow these rules when correcting the original subtitles:
+- Only correct speech recognition errors while maintaining the original structure
+- Remove meaningless interjections
+- Standardize punctuation and formatting
+- Maintain one-to-one correspondence
+- Preserve original meaning and technical accuracy
 
-[2. Translation Process]
-Based on the corrected subtitles, translate them into [TargetLanguage] following these steps:
-   - Provide accurate translations that faithfully convey the original meaning.
-   - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
-   - Retain all key terms, proper nouns, and abbreviations without translation.
-   - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
-   - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
-   - Consider surrounding subtitles for context.
+[5. Translation Process]
+Based on the corrected subtitles, translate into [TargetLanguage] following these steps:
+   - Provide accurate translations that faithfully convey the original meaning
+   - Use natural expressions that conform to target language conventions
+   - Retain key terms and proper nouns
+   - Consider cultural context and domain-specific terminology
+   - Maintain contextual coherence
+   - Consider surrounding subtitles for context
 
-[3. Reference Material Integration]
-If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
-- For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
-- For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
-
-[4. Output Format]
-Return a pure JSON with the following structure for each subtitle (identified by a unique numeric key):
+[6. Output Format]
+Return a pure JSON with the following structure for each subtitle:
 {
   "1": {
-    "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
-    "translation": "Translation of optimized_subtitle in [TargetLanguage]"
+    "optimized_subtitle": "Corrected original subtitle text",
+    "translation": "Translation in [TargetLanguage]"
   },
   "2": { ... },
   ...
@@ -206,64 +311,88 @@ Correct the original subtitles and translate them into Chinese:
 """
 
 REFLECT_TRANSLATE_PROMPT = """
-You are a subtitle proofreading and translation expert. Your task is to process subtitles generated through speech recognition.
+You are a subtitle proofreading and translation expert with strong analytical and reflection capabilities.
 
-These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
-1. Errors due to similar pronunciations
-2. Improper punctuation
-3. Incorrect capitalization of English words
-4. Terminology or proper noun errors
+[1. Content Analysis Integration]
+If provided with content analysis (from the summarizer), adapt your translation and reflection strategy:
 
-If provided, please prioritize the following reference information:
-- Optimization prompt
-- Content summary
+a) Technical Tutorials:
+   - Verify technical term accuracy
+   - Ensure code syntax preservation
+   - Check documentation style consistency
+   - Validate command and variable name handling
+
+b) Educational Content:
+   - Evaluate pedagogical clarity
+   - Check terminology consistency
+   - Assess learning flow preservation
+   - Review cultural adaptation appropriateness
+
+c) Interviews/Conversations:
+   - Analyze tone preservation
+   - Check conversational authenticity
+   - Verify technical term consistency
+   - Evaluate expression naturalization
+
+d) Product Demos:
+   - Verify product terminology accuracy
+   - Check step-by-step clarity
+   - Validate feature name consistency
+   - Review UI term localization
+
+[2. Error Analysis]
+Address the following potential issues:
+1. ASR misrecognition patterns
+2. Punctuation and formatting
+3. Capitalization and technical terms
+4. Domain-specific terminology
+
+[3. Reference Integration]
+Prioritize and integrate:
+- Content analysis and domain classification
+- Error corrections with confidence levels
 - Technical terminology list
 - Original correct subtitles
 
-[1. Subtitle Optimization (for optimized_subtitle)]
-Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
-- Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
-- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
-- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
-- If the sentence is correct, do not modify the original words, structure, and expressions.
-- Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
+[4. Translation Process]
 
-[2. Translation Process]
-Based on the corrected subtitles, translate them into [TargetLanguage] following these steps:
+a) Initial Translation:
+   - Provide accurate and faithful translations
+   - Use natural target language expressions
+   - Preserve key terms and proper nouns
+   - Consider domain context and terminology
+   - Maintain subtitle coherence
+   - Reference surrounding context
 
-(a) Translation:
-   - Provide accurate translations that faithfully convey the original meaning.
-   - Use natural expressions that conform to [TargetLanguage] grammar and expression habits, avoiding literal translations.
-   - Retain all key terms, proper nouns, and abbreviations without translation.
-   - Consider the target language's cultural background, appropriately using authentic idioms and modern expressions to enhance readability.
-   - Maintain contextual coherence within each subtitle segment, but DO NOT try to complete incomplete sentences.
-   - Consider surrounding subtitles for context.
-(b) Translation Revision Suggestions:
-   - Focus ONLY on the current subtitle segment's translation quality
-   - DO NOT suggest completing incomplete sentences or adding context from other segments
-   - Evaluate translation accuracy, terminology consistency, and cultural appropriateness
-   - Point out any awkward expressions or unclear translations within the current segment
-   - Suggest improvements for technical terms or industry-specific language if needed
+b) Critical Analysis:
+   - Evaluate technical accuracy
+   - Check cultural appropriateness
+   - Assess terminology consistency
+   - Review expression naturalness
+   - Verify context preservation
+   - Consider domain-specific requirements
 
-(c) Revised Translation:
-   - Provide an improved version of the translation based on the revision suggestions (no explanation needed).
+c) Reflection and Improvement:
+   - Identify potential issues
+   - Suggest specific improvements
+   - Consider alternative expressions
+   - Propose terminology refinements
+   - Recommend structural adjustments
+   - Address cultural nuances
 
-[3. Reference Material Integration]
-If reference information is provided along with the subtitles (for example, a JSON object containing a "summary" and "terms"), you must use this data to guide your output as follows:
-- For optimized_subtitle: Ensure your corrections align with the overall context and key messages described in the summary. Preserve nuances that may be implied by the video content.
-- For translation: Incorporate key entities and keywords from the "terms" field, ensuring consistency with technical terminology and proper nouns provided in the reference.
-- For revise_suggestions: Evaluate the translation against the provided summary and terms, and offer specific suggestions to enhance clarity, cultural relevance, and technical accuracy within the current segment only.
-- For revised_translation: Provide a refined translation that incorporates the improvement suggestions based on the reference material.
-
-[4. Output Format]
-Return a pure JSON with the following structure for each subtitle (identified by a unique numeric key):
+[5. Output Format]
+Return a JSON with the following structure for each subtitle:
 {
   "1": {
-    "optimized_subtitle": "Corrected original subtitle text (optimized according to the above rules)",
-    "translation": "Translation of optimized_subtitle in [TargetLanguage]",
-    "revise_suggestions": "Suggestions for improving translation quality ONLY for the current segment",
-    "revised_translation": "Final translation improved based on revision suggestions"
+    "optimized_subtitle": "Corrected original text",
+    "translation": "Initial translation",
+    "revise_suggestions": {
+      "technical_accuracy": "Technical term verification",
+      "cultural_adaptation": "Cultural appropriateness analysis",
+      "expression_quality": "Natural expression evaluation",
+      "domain_specific": "Domain-related considerations"
+    },
+    "revised_translation": "Improved translation based on analysis"
   },
   "2": { ... },
   ...
@@ -282,38 +411,6 @@ Return a pure JSON with the following structure for each subtitle (identified by
 - few-shot -> 少样本学习
 - multi-modal -> 多模态
 - fine-tuning -> 微调
-
-# EXAMPLE_INPUT
-Correct the original subtitles and translate them into Chinese: 
-{
-  "1": "This makes brainstorming and drafting", 
-  "2": "and iterating on the text much easier.",
-  "3": "where you can collaboratively edit and refine text or code together with Jack GPT."
-}
-
-# EXAMPLE_OUTPUT
-{
-  "1": {
-    "optimized_subtitle": "This makes brainstorming and drafting",
-    "translation": "这使得头脑风暴和草拟",
-    "revise_suggestions": "Consider using more natural Chinese expressions for 'brainstorming'",
-    "revised_translation": "这让头脑风暴和起草"
-  },
-  "2": {
-    "optimized_subtitle": "and iterating on the text much easier.",
-    "translation": "以及对文本进行迭代变得更容易",
-    "revise_suggestions": "The translation is accurate and natural",
-    "revised_translation": "以及对文本进行迭代变得更容易"
-  },
-  "3": {
-    "optimized_subtitle": "where you can collaboratively edit and refine text or code together with ChatGPT",
-    "translation": "你可以与ChatGPT一起协作编辑和优化文本或代码",
-    "revise_suggestions": "The term 'Jack GPT' has been corrected to 'ChatGPT'. The translation accurately reflects the collaborative nature of the tool",
-    "revised_translation": "你可以与ChatGPT一起协作编辑和优化文本或代码"
-  }
-}
-
-Please process the given subtitles according to these instructions and return the results in the specified JSON format.
 """
 
 SINGLE_TRANSLATE_PROMPT = """

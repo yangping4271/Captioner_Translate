@@ -184,17 +184,96 @@ class SubtitleOptimizer:
             "translated_subtitles": translated_subtitle
         }
 
-    def _create_translate_message(self, original_subtitle: Dict[str, str], summary_content: Dict, reflect=False):
-        """创建翻译提示消息"""
-        input_content = (f"correct the original subtitles, and translate them into {self.config.target_language}:"
-                        f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
+    def _create_translate_message(self, original_subtitle: Dict[str, str], summary_content: Optional[Dict], reflect=False):
+        """创建翻译提示消息
+        
+        Args:
+            original_subtitle: 原始字幕内容字典
+            summary_content: 结构化的摘要信息字典，包含content_analysis、summary、error_corrections和terms
+            reflect: 是否使用反思模式
+            
+        Returns:
+            List[Dict]: 包含system和user消息的列表
+        """
+        # 1. 基础输入内容
+        input_content = (
+            f"correct the original subtitles, and translate them into {self.config.target_language}:"
+            f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>"
+        )
 
-        if summary_content:
-            input_content += (f"\nThe following is reference material related to subtitles, based on which "
-                            f"the subtitles will be corrected, optimized, and translated. Pay special attention "
-                            f"to the potential misrecognitions and use them along with context to make intelligent "
-                            f"corrections:\n<prompt>{summary_content}</prompt>\n")
+        # 2. 处理summary_content
+        if not summary_content:
+            logger.debug("No summary content provided, proceeding with basic translation")
+            return [
+                {"role": "system", "content": REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT},
+                {"role": "user", "content": input_content}
+            ]
 
+        try:
+            # 3. 构建参考材料
+            reference_material = []
+            
+            # 3.1 内容分析部分
+            content_analysis = summary_content.get("content_analysis", {})
+            if content_analysis:
+                analysis_text = (
+                    "Content Context:\n"
+                    f"- Video Type: {content_analysis.get('video_type', 'N/A')}\n"
+                    f"- Domain: {content_analysis.get('domain', 'N/A')}\n"
+                    f"- Complexity Level: {content_analysis.get('complexity_level', 'N/A')}\n"
+                    f"- Target Audience: {content_analysis.get('target_audience', 'N/A')}"
+                )
+                reference_material.append(f"<content_analysis>\n{analysis_text}\n</content_analysis>")
+            
+            # 3.2 错误修正部分
+            error_corrections = summary_content.get("error_corrections", [])
+            if error_corrections:
+                error_text = "Known Issues:\n" + "\n".join([
+                    f"- Original: {err.get('original', '')}\n"
+                    f"  Corrected: {err.get('corrected', '')}\n"
+                    f"  Type: {err.get('error_type', '')}\n"
+                    f"  Confidence: {err.get('confidence', '')}"
+                    for err in error_corrections
+                ])
+                reference_material.append(f"<error_patterns>\n{error_text}\n</error_patterns>")
+            
+            # 3.3 术语部分
+            terms = summary_content.get("terms", {})
+            if terms:
+                terms_text = []
+                if terms.get("entities"):
+                    terms_text.append("Entities:\n" + "\n".join([f"- {entity}" for entity in terms["entities"]]))
+                if terms.get("keywords"):
+                    terms_text.append("Keywords:\n" + "\n".join([f"- {keyword}" for keyword in terms["keywords"]]))
+                if terms_text:
+                    reference_material.append(f"<terminology>\n{'\n\n'.join(terms_text)}\n</terminology>")
+            
+            # 3.4 摘要部分
+            if summary_content.get("summary"):
+                reference_material.append(
+                    f"<summary>\n{summary_content['summary']}\n</summary>"
+                )
+            
+            # 4. 合并所有参考材料
+            if reference_material:
+                input_content += "\n\nReference Material Analysis:\n" + "\n\n".join(reference_material)
+                
+                # 添加使用指南
+                input_content += "\n\nPlease use this reference material to:"
+                input_content += "\n- Maintain technical accuracy and terminology consistency"
+                input_content += "\n- Apply identified error corrections"
+                input_content += "\n- Consider the content type and target audience"
+                input_content += "\n- Ensure domain-appropriate translations"
+
+        except Exception as e:
+            logger.error(f"Error processing summary content: {e}")
+            logger.debug("Falling back to basic translation without summary")
+            return [
+                {"role": "system", "content": REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT},
+                {"role": "user", "content": input_content}
+            ]
+
+        # 5. 准备最终消息
         prompt = REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT
         prompt = prompt.replace("[TargetLanguage]", self.config.target_language)
 

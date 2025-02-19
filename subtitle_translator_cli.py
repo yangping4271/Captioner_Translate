@@ -76,8 +76,12 @@ class SubtitleTranslator:
             
         return from_subtitle_file(input_file)
 
-    def _get_subtitle_summary(self, asr_data: ASRData) -> str:
-        """获取字幕内容摘要"""
+    def _get_subtitle_summary(self, asr_data: ASRData) -> Dict:
+        """获取字幕内容摘要
+        
+        Returns:
+            Dict: 包含content_analysis、error_corrections和terms的结构化摘要信息
+        """
         logger.info(f"正在使用 {self.config.llm_model} 总结字幕...")
         summarize_result = self.summarizer.summarize(asr_data.to_txt())
         logger.info(f"总结字幕内容:{summarize_result}")

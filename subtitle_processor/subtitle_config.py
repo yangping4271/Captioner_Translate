@@ -122,7 +122,9 @@ You are a subtitle proofreading and translation expert. Your task is to process 
 
 These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
 1. Errors due to similar pronunciations
-2. Terminology or proper noun errors
+2. Improper punctuation
+3. Incorrect capitalization of English words
+4. Terminology or proper noun errors
 
 If provided, please prioritize the following reference information:
 - Optimization prompt
@@ -208,7 +210,9 @@ You are a subtitle proofreading and translation expert. Your task is to process 
 
 These subtitles may contain errors, and you need to correct the original subtitles and translate them into [TargetLanguage]. The subtitles may have the following issues:
 1. Errors due to similar pronunciations
-2. Terminology or proper noun errors
+2. Improper punctuation
+3. Incorrect capitalization of English words
+4. Terminology or proper noun errors
 
 If provided, please prioritize the following reference information:
 - Optimization prompt

@@ -31,8 +31,7 @@ class SubtitleSummarizer:
         response = self.client.chat.completions.create(
             model=self.config.llm_model,
             stream=False,
-            messages=message,
-            temperature=0.2
+            messages=message
         )
         result = json_repair.loads(response.choices[0].message.content)
         return result

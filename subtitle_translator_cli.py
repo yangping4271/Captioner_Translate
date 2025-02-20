@@ -77,11 +77,7 @@ class SubtitleTranslator:
         return from_subtitle_file(input_file)
 
     def _get_subtitle_summary(self, asr_data: ASRData) -> Dict:
-        """获取字幕内容摘要
-        
-        Returns:
-            Dict: 包含content_analysis、error_corrections和terms的结构化摘要信息
-        """
+        """获取字幕内容摘要"""
         logger.info(f"正在使用 {self.config.llm_model} 总结字幕...")
         summarize_result = self.summarizer.summarize(asr_data.to_txt())
         logger.info(f"总结字幕内容:{summarize_result}")
@@ -158,7 +154,7 @@ class SubtitleTranslator:
         # 保存优化后的英文字幕
         optimized_subtitles = {}
         for item in translate_result:
-            optimized_subtitles[item["id"]] = item["optimized_subtitle"]
+            optimized_subtitles[item["id"]] = item["optimized"]
         self._save_srt_file(asr_data.segments, optimized_subtitles, str(en_path), "优化")
 
         # 保存翻译后的中文字幕

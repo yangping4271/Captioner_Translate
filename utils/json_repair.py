@@ -25,6 +25,9 @@ All supported use cases are in the unit tests
 import os
 import json
 from typing import Any, Dict, List, Optional, Union, TextIO, Tuple
+from utils.logger import setup_logger
+
+logger = setup_logger("json_repair")
 
 
 class StringFileWrapper:
@@ -746,3 +749,50 @@ def from_file(
     fd.close()
 
     return jsonobj
+
+def clean_llm_response(response: str) -> str:
+    """清理LLM返回的JSON字符串
+    
+    Args:
+        response: LLM返回的原始响应字符串
+        
+    Returns:
+        清理后的JSON字符串
+    """
+    # 移除开头和结尾的三引号和换行符
+    cleaned = response.strip('"\n ')
+    if cleaned.startswith('"""') and cleaned.endswith('"""'):
+        cleaned = cleaned[3:-3]
+    # 移除可能的转义字符
+    cleaned = cleaned.replace('\\"', '"')
+    return cleaned.strip()
+
+def parse_llm_response(response: str) -> Dict:
+    """解析LLM返回的JSON响应
+    
+    Args:
+        response: LLM返回的原始响应字符串
+        
+    Returns:
+        解析后的JSON对象
+        
+    Raises:
+        JSONDecodeError: 当JSON解析完全失败时抛出异常
+    """
+    # 1. 首先尝试清理三引号并直接解析
+    cleaned = clean_llm_response(response)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        # 2. 如果失败，再使用json_repair
+        try:
+            return loads(cleaned)
+        except Exception as e:
+            # 记录更详细的错误信息
+            error_msg = f"JSON解析失败: {str(e)}\n原始响应片段: {response[:100]}..."
+            logger.error(error_msg)
+            raise json.JSONDecodeError(
+                msg=f"无法解析LLM响应: {str(e)}", 
+                doc=response,
+                pos=0
+            ) from e

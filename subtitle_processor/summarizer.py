@@ -2,7 +2,7 @@ from typing import Dict, Optional
 from openai import OpenAI
 from .prompts import SUMMARIZER_PROMPT
 from .config import SubtitleConfig
-from utils import json_repair
+from utils.json_repair import parse_llm_response
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_summarizer")
@@ -33,5 +33,5 @@ class SubtitleSummarizer:
             stream=False,
             messages=message
         )
-        result = json_repair.loads(response.choices[0].message.content)
+        result = parse_llm_response(response.choices[0].message.content)
         return result

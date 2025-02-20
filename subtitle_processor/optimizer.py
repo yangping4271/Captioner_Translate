@@ -11,7 +11,7 @@ from .prompts import (
     SINGLE_TRANSLATE_PROMPT
 )
 from .config import SubtitleConfig
-from utils import json_repair
+from utils.json_repair import parse_llm_response
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_optimizer")
@@ -230,7 +230,7 @@ class SubtitleOptimizer:
             messages=message,
             temperature=0.7
         )
-        response_content = json_repair.loads(response.choices[0].message.content)
+        response_content = parse_llm_response(response.choices[0].message.content)
 
         translated_subtitle = []
         for k, v in response_content.items():
@@ -270,7 +270,7 @@ class SubtitleOptimizer:
             messages=message,
             temperature=0.7
         )
-        response_content = json_repair.loads(response.choices[0].message.content)
+        response_content = parse_llm_response(response.choices[0].message.content)
 
         translated_subtitle = []
         for k, v in response_content.items():

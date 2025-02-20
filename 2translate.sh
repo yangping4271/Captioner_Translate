@@ -65,7 +65,8 @@ for file in $files; do
         if [ -f "./${file}.ass" ]; then
             echo "INFO: ${file}.ass done."
             rm "./${file}_zh.srt"
-            rm "./${file}_en.srt"
+            # rm "./${file}_en.srt"
+            mv "./${file}_en.srt" "./_${file}_en.srt"
         fi
     fi
 done

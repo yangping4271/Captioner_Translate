@@ -28,6 +28,32 @@ def count_words(text: str) -> int:
     logger.debug(f"字数统计结果：中文字符 {chinese_chars}，英文单词 {english_words}，总计 {total}")
     return total
 
+def post_process_segments(segments: List[str]) -> List[str]:
+    """
+    对LLM返回的分段结果进行后处理
+    - 检查句号后跟空格的情况
+    - 在需要的地方进行额外的分割
+    """
+    result = []
+    for segment in segments:
+        # 查找所有的句号+空格模式
+        parts = re.split(r'(\. )', segment)
+        current_part = ""
+        
+        for i, part in enumerate(parts):
+            current_part += part
+            # 如果是句号+空格模式，且不是最后一部分
+            if part == ". " and i < len(parts) - 1:
+                # 确保当前部分不为空再添加
+                if current_part.strip():
+                    result.append(current_part.strip())
+                current_part = ""
+        
+        # 添加最后剩余的部分
+        if current_part.strip():
+            result.append(current_part.strip())
+    
+    return result
 
 def split_by_llm(text: str, 
                  model: str = None, 
@@ -114,10 +140,8 @@ def split_by_llm_retry(text: str,
         result = re.sub(r'\n+', '', result)
         split_result = [segment.strip() for segment in result.split("<br>") if segment.strip()]
         
-        # 检查每个句子是否包含句中句点
-        for i, segment in enumerate(split_result, 1):
-            if re.search(r'\. +[A-Za-z]', segment):
-                logger.info(f"句子中包含句中句点: {segment}")
+        # 对分割结果进行后处理
+        split_result = post_process_segments(split_result)
         
         # 验证结果
         word_count = count_words(text)

@@ -79,6 +79,7 @@ def split_by_llm_retry(text: str,
         Exception: 当分段结果不满足要求时抛出异常
     """
     logger.debug(f"开始处理文本，长度：{len(text)}，模型：{model}")
+    logger.debug(f"输入文本: {text}")
     
     # 准备提示词
     system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_cjk]", str(max_word_count_cjk))
@@ -113,6 +114,11 @@ def split_by_llm_retry(text: str,
         result = re.sub(r'\n+', '', result)
         split_result = [segment.strip() for segment in result.split("<br>") if segment.strip()]
         
+        # 检查每个句子是否包含句中句点
+        for i, segment in enumerate(split_result, 1):
+            if re.search(r'\. +[A-Za-z]', segment):
+                logger.info(f"句子中包含句中句点: {segment}")
+        
         # 验证结果
         word_count = count_words(text)
         expected_segments = word_count / max_word_count_cjk
@@ -121,11 +127,6 @@ def split_by_llm_retry(text: str,
         
         if actual_segments < expected_segments * 0.9:
             raise Exception(f"断句数量不足：预期 {expected_segments:.1f}，实际 {actual_segments}")
-        
-        # 记录每个分段的详细信息
-        for i, segment in enumerate(split_result, 1):
-            seg_words = count_words(segment)
-            logger.debug(f"第{i}段：长度 {len(segment)}，字数 {seg_words}")
             
         return split_result
         

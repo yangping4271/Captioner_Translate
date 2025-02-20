@@ -19,53 +19,52 @@ source ~/Captioner_Translate/venv/bin/activate
 
 # 检查文件是否已翻译
 for file in $files; do
-    # 如果存在file.ass，则跳过
+    # 1. 如果存在file.ass，则跳过
     if [ -f "./${file}.ass" ]; then
         echo "INFO: ${file}.ass already exists."
         continue
     fi
     
-    # 存在zh.srt，则不需要翻译
-    if [ -f "./${file}_zh.srt" ]; then
-        if [ -f "./${file}_en.srt" ]; then
-            echo "INFO: ${file}_en.srt and ${file}_zh.srt already exist."
+    # 2. 如果同时存在zh.srt和en.srt，直接生成ass
+    if [ -f "./${file}_zh.srt" ] && [ -f "./${file}_en.srt" ]; then
+        python3 ~/Captioner_Translate/srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
+        if [ -f "./${file}.ass" ]; then
+            echo "INFO: ${file}.ass done."
+            rm "./${file}_zh.srt" "./${file}_en.srt"
         fi
-        if [ -f "./${file}.srt" ] ; then
-            mv "./${file}.srt" "./${file}_en.srt"
-        fi
-    # 如果存在en.srt，则翻译en文件
-    elif [ -f "./${file}_en.srt" ]; then
-        if [ -f "./${file}.srt" ]; then
-            mv "./${file}.srt" "./${file}_original.srt"
-        fi
-        mv "./${file}_en.srt" "./${file}.srt"
-        python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
-        # 没有断句文件，恢复原来的文件
-        if [ -f "./${file}.srt" ]; then
-            mv "./${file}.srt" "./${file}_en.srt"
-        fi
-
-    # 只有.srt，则翻译.srt
-    elif [ -f "./${file}.srt" ]; then
-        python3 ~/Captioner_Translate/subtitle_translator_cli.py "${file}.srt" "$@"
-        # 没有断句文件
-        if [ ! -f "./${file}_en.srt" ]; then
-            mv "./${file}.srt" "./${file}_en.srt"
-        fi
+        continue
     fi
     
-    # 恢复原来的.srt文件
-    if [ -f "./${file}_original.srt" ]; then
-        mv "./${file}_original.srt" "./${file}.srt"
+    # 确定输入文件
+    input_file=""
+    # 3. 如果存在zh.srt但没有en.srt，需要翻译原始字幕
+    if [ -f "./${file}_zh.srt" ] && [ ! -f "./${file}_en.srt" ]; then
+        if [ -f "./${file}.srt" ]; then
+            input_file="./${file}.srt"
+        else
+            echo "ERROR: No original subtitle found for ${file} with zh.srt"
+            continue
+        fi
+    # 4. 如果存在en.srt，用它翻译
+    elif [ -f "./${file}_en.srt" ]; then
+        input_file="./${file}_en.srt"
+    # 5. 如果只有.srt，用它翻译
+    elif [ -f "./${file}.srt" ]; then
+        input_file="./${file}.srt"
+    else
+        echo "ERROR: No input file found for ${file}"
+        continue
     fi
-
+    
+    # 调用翻译脚本
+    python3 ~/Captioner_Translate/subtitle_translator_cli.py "$input_file" "$@"
+    
     # 生成ass字幕文件
     if [ -f "./${file}_zh.srt" ] && [ -f "./${file}_en.srt" ] && [ ! -f "./${file}.ass" ]; then
         python3 ~/Captioner_Translate/srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
         if [ -f "./${file}.ass" ]; then
             echo "INFO: ${file}.ass done."
-            rm "./${file}_zh.srt"
-            rm "./${file}_en.srt"
+            rm "./${file}_zh.srt" "./${file}_en.srt"
         fi
     fi
 done

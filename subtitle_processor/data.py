@@ -219,6 +219,36 @@ class SubtitleData:
             
         logger.info(f"{operation}后的字幕已保存至: {output_path}")
 
+    def save_translations_to_files(self, translate_result: List[Dict], 
+                                en_output: str, zh_output: str) -> None:
+        """
+        保存翻译结果到指定的文件路径
+        
+        Args:
+            translate_result: 翻译结果列表
+            en_output: 英文字幕输出路径
+            zh_output: 中文字幕输出路径
+        """
+        logger.info("开始保存...")
+
+        # 保存优化后的英文字幕
+        optimized_subtitles = {item["id"]: item["optimized"] for item in translate_result}
+        self.save_translation(en_output, optimized_subtitles, "优化")
+
+        # 保存翻译后的中文字幕
+        translated_subtitles = {
+            item["id"]: item.get("revised_translation", item["translation"])
+            for item in translate_result
+        }
+        self.save_translation(zh_output, translated_subtitles, "翻译")
+
+        # 只在最后统一打印总体统计
+        total = len(self.segments)
+        valid = sum(1 for item in translate_result if item.get("optimized", "").strip())
+        skipped = total - valid
+        logger.info(f"总字幕数: {total}, 有效字幕数: {valid}, 跳过字幕数: {skipped}")
+        logger.info("保存完成")
+
     def __str__(self):
         return self.to_txt()
 

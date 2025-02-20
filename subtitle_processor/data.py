@@ -131,14 +131,40 @@ class SubtitleData:
         # 删除下一个段
         del self.segments[index + 1]
 
+    def save_translations(self, base_path: Path, translate_result: List[Dict], 
+                        en_suffix: str = ".en.srt", zh_suffix: str = ".zh.srt") -> None:
+        """
+        保存翻译结果，包括优化后的英文字幕和翻译后的中文字幕
+        """
+        # 构建输出文件路径
+        base_name = base_path.stem
+        output_dir = base_path.parent
+        en_path = output_dir / f"{base_name}{en_suffix}"
+        zh_path = output_dir / f"{base_name}{zh_suffix}"
+
+        logger.info("开始保存...")
+
+        # 保存优化后的英文字幕
+        optimized_subtitles = {item["id"]: item["optimized"] for item in translate_result}
+        self.save_translation(str(en_path), optimized_subtitles, "优化")
+
+        # 保存翻译后的中文字幕
+        translated_subtitles = {
+            item["id"]: item.get("revised_translation", item["translation"])
+            for item in translate_result
+        }
+        self.save_translation(str(zh_path), translated_subtitles, "翻译")
+
+        # 只在最后统一打印总体统计
+        total = len(self.segments)
+        valid = sum(1 for item in translate_result if item.get("optimized", "").strip())
+        skipped = total - valid
+        logger.info(f"总字幕数: {total}, 有效字幕数: {valid}, 跳过字幕数: {skipped}")
+        logger.info("保存完成")
+
     def save_translation(self, output_path: str, subtitle_dict: Dict[int, str], operation: str = "处理") -> None:
         """
         保存翻译或优化后的字幕文件
-        
-        Args:
-            output_path: 输出文件路径
-            subtitle_dict: 字幕内容字典，key为段落编号，value为字幕文本
-            operation: 操作类型描述，用于日志
         """
         # 创建输出目录（如果不存在）
         output_dir = Path(output_path).parent
@@ -164,8 +190,10 @@ class SubtitleData:
                 logger.warning(f"字幕 {i} 的内容为None，将被跳过")
                 continue
                 
+            processed_text = subtitle_text.strip()
+                
             # 如果字幕内容为空，跳过该字幕
-            if not subtitle_text.strip():
+            if not processed_text:
                 logger.debug(f"字幕 {i} 的内容为空，将被跳过")
                 continue
                 
@@ -175,7 +203,7 @@ class SubtitleData:
             srt_lines.extend([
                 str(valid_subtitle_count),  # 使用新的编号
                 segment.to_srt_ts(),
-                subtitle_text,
+                processed_text,
                 ""  # 空行分隔
             ])
 
@@ -190,39 +218,6 @@ class SubtitleData:
             raise Exception(f"字幕{operation}失败: 文件未能成功保存")
             
         logger.info(f"{operation}后的字幕已保存至: {output_path}")
-        logger.info(f"总字幕数: {len(self.segments)}, 有效字幕数: {valid_subtitle_count}, 跳过字幕数: {len(self.segments) - valid_subtitle_count}")
-
-    def save_translations(self, base_path: Path, translate_result: List[Dict], 
-                        en_suffix: str = ".en.srt", zh_suffix: str = ".zh.srt") -> None:
-        """
-        保存翻译结果，包括优化后的英文字幕和翻译后的中文字幕
-        
-        Args:
-            base_path: 基础文件路径
-            translate_result: 翻译结果列表
-            en_suffix: 英文字幕文件后缀
-            zh_suffix: 中文字幕文件后缀
-        """
-        # 构建输出文件路径
-        base_name = base_path.stem
-        output_dir = base_path.parent
-        en_path = output_dir / f"{base_name}{en_suffix}"
-        zh_path = output_dir / f"{base_name}{zh_suffix}"
-
-        logger.info("开始保存...")
-
-        # 保存优化后的英文字幕
-        optimized_subtitles = {item["id"]: item["optimized"] for item in translate_result}
-        self.save_translation(str(en_path), optimized_subtitles, "优化")
-
-        # 保存翻译后的中文字幕
-        translated_subtitles = {
-            item["id"]: item.get("revised_translation", item["translation"])
-            for item in translate_result
-        }
-        self.save_translation(str(zh_path), translated_subtitles, "翻译")
-
-        logger.info("保存完成")
 
     def __str__(self):
         return self.to_txt()

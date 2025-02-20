@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from subtitle_processor.split_by_llm import split_by_llm
-from bk_asr.ASRData import ASRData, ASRDataSeg
+from subtitle_processor.data import SubtitleData, SubtitleSegment
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_spliter")
@@ -80,17 +80,17 @@ def preprocess_text(s: str) -> str:
     return ' '.join(s.lower().split())
 
 
-def merge_segments_based_on_sentences(segments: List[ASRDataSeg], sentences: List[str], max_unmatched: int = 5) -> List[ASRDataSeg]:
+def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences: List[str], max_unmatched: int = 5) -> List[SubtitleSegment]:
     """
-    基于提供的句子列表合并ASR分段
+    基于提供的句子列表合并字幕分段
     
     Args:
-        asr_data: ASR数据对象
+        segments: 字幕段列表
         sentences: 句子列表
         max_unmatched: 允许的最大未匹配句子数量，超过此数量将抛出异常
         
     Returns:
-        合并后的 ASRDataSeg 列表
+        合并后的 SubtitleSegment 列表
         
     Raises:
         SubtitleProcessError: 当未匹配句子数量超过阈值时抛出
@@ -156,7 +156,7 @@ def merge_segments_based_on_sentences(segments: List[ASRDataSeg], sentences: Lis
                 merged_text = ' '.join(seg.text.strip() for seg in group)
                 merged_start_time = group[0].start_time
                 merged_end_time = group[-1].end_time
-                merged_seg = ASRDataSeg(merged_text, merged_start_time, merged_end_time)
+                merged_seg = SubtitleSegment(merged_text, merged_start_time, merged_end_time)
                 
                 # 考虑最大词数的拆分
                 split_segs = split_long_segment(group)
@@ -203,7 +203,7 @@ def is_mainly_cjk(text: str) -> bool:
     return cjk_count / total_chars > 0.5 if total_chars > 0 else False
 
 
-def split_long_segment(segs_to_merge: List[ASRDataSeg]) -> List[ASRDataSeg]:
+def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSegment]:
     """
     基于最大时间间隔拆分长分段，根据文本类型使用不同的最大词数限制
     """
@@ -222,7 +222,7 @@ def split_long_segment(segs_to_merge: List[ASRDataSeg]) -> List[ASRDataSeg]:
 
     # 基本情况：如果分段足够短或无法进一步拆分
     if count_words(merged_text) <= max_word_count or len(segs_to_merge) == 1:
-        merged_seg = ASRDataSeg(
+        merged_seg = SubtitleSegment(
             merged_text.strip(),
             segs_to_merge[0].start_time,
             segs_to_merge[-1].end_time
@@ -262,14 +262,9 @@ def split_long_segment(segs_to_merge: List[ASRDataSeg]) -> List[ASRDataSeg]:
     return result_segs
 
 
-def split_asr_data(asr_data: ASRData, num_segments: int) -> List[ASRData]:
+def split_asr_data(asr_data: SubtitleData, num_segments: int) -> List[SubtitleData]:
     """
-    长文本发送LLM前进行进行分割，根据ASR分段中的时间间隔，将ASRData拆分成多个部分。
-
-    处理步骤：
-    1. 计算总字数，并确定每个分段的字数范围。
-    2. 确定平均分割点。
-    3. 在分割点前后一定范围内，寻找时间间隔最大的点作为实际的分割点。
+    将字幕数据分割成指定数量的段
     """
     total_segs = len(asr_data.segments)
     total_word_count = count_words(asr_data.to_txt())
@@ -303,22 +298,19 @@ def split_asr_data(asr_data: ASRData, num_segments: int) -> List[ASRData]:
     segments = []
     prev_index = 0
     for index in adjusted_split_indices:
-        part = ASRData(asr_data.segments[prev_index:index + 1])
+        part = SubtitleData(asr_data.segments[prev_index:index + 1])
         segments.append(part)
         prev_index = index + 1
     # 添加最后一部分
     if prev_index < total_segs:
-        part = ASRData(asr_data.segments[prev_index:])
+        part = SubtitleData(asr_data.segments[prev_index:])
         segments.append(part)
     return segments
 
 
-def merge_short_segment(segments: List[ASRDataSeg]) -> None:
+def merge_short_segment(segments: List[SubtitleSegment]) -> None:
     """
-    经过LLM断句后，继续优化字幕，合并词数少于等于5且时间相邻的段落。
-    
-    Args:
-        segments: 字幕段落列表，将直接在此列表上进行修改
+    合并过短的分段
     """
     if not segments:  # 添加空列表检查
         return
@@ -372,14 +364,14 @@ def determine_num_segments(word_count: int, threshold: int = 1000) -> int:
     return max(1, num_segments)
 
 
-def preprocess_segments(segments: List[ASRDataSeg], need_lower=True) -> List[ASRDataSeg]:
+def preprocess_segments(segments: List[SubtitleSegment], need_lower=True) -> List[SubtitleSegment]:
     """
-    预处理ASR数据分段:
+    预处理字幕分段:
     1. 移除纯标点符号的分段
     2. 对仅包含字母、数字和撇号的文本进行小写处理并添加空格
     
     Args:
-        segments: ASR数据分段列表
+        segments: 字幕分段列表
     Returns:
         处理后的分段列表
     """
@@ -396,17 +388,9 @@ def preprocess_segments(segments: List[ASRDataSeg], need_lower=True) -> List[ASR
     return new_segments
 
 
-def merge_by_time_gaps(segments: List[ASRDataSeg], max_gap: int = MAX_GAP, check_large_gaps: bool = False) -> List[List[ASRDataSeg]]:
+def merge_by_time_gaps(segments: List[SubtitleSegment], max_gap: int = MAX_GAP, check_large_gaps: bool = False) -> List[List[SubtitleSegment]]:
     """
-    检查字幕分段之间的时间间隔，如果超过阈值则分段
-    
-    Args:
-        segments: 待检查的分段列表
-        max_gap: 最大允许的时间间隔（ms）
-        check_large_gaps: 是否检查连续的大时间间隔
-        
-    Returns:
-        分段后的列表的列表
+    根据时间间隔合并分段
     """
     if not segments:
         return []
@@ -446,15 +430,9 @@ def merge_by_time_gaps(segments: List[ASRDataSeg], max_gap: int = MAX_GAP, check
     return result
 
 
-def merge_common_words(segments: List[ASRDataSeg]) -> List[List[ASRDataSeg]]:
+def merge_common_words(segments: List[SubtitleSegment]) -> List[List[SubtitleSegment]]:
     """
-    在常见连接词前后进行分割，确保分割后的每个分段都至少有5个单词
-    假设每个segment就是一个词
-    
-    Args:
-        segments: ASR数据分段列表，每个segment包含一个词
-    Returns:
-        分组后的分段列表的列表
+    合并常见词组的分段
     """
     # 定义在词语前面分割的常见词（prefix_split_words）
     prefix_split_words = {
@@ -529,19 +507,9 @@ def merge_common_words(segments: List[ASRDataSeg]) -> List[List[ASRDataSeg]]:
     return result
 
 
-def process_by_rules(segments: List[ASRDataSeg]) -> List[ASRDataSeg]:
+def process_by_rules(segments: List[SubtitleSegment]) -> List[SubtitleSegment]:
     """
-    使用规则进行基础的句子分割
-    
-    规则包括:
-    1. 考虑时间间隔，超过阈值的进行分割
-    2. 在常见连接词前后进行分割（保证分割后两个分段都大于5个单词）
-    3. 分割大于 MAX_WORD_COUNT 个单词的分段
-
-    Args:
-        segments: ASR数据分段列表
-    Returns:
-        处理后的分段列表
+    使用规则处理分段
     """
     logger.info(f"分段: {len(segments)}")
     # 1. 先按时间间隔分组
@@ -568,17 +536,12 @@ def process_by_rules(segments: List[ASRDataSeg]) -> List[ASRDataSeg]:
     return result_segments
 
 
-def process_by_llm(segments: List[ASRDataSeg], 
+def process_by_llm(segments: List[SubtitleSegment], 
                    model: str = "gpt-4o-mini",
                    max_word_count_cjk: int = MAX_WORD_COUNT_CJK,
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> List[ASRDataSeg]:
-
+                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> List[SubtitleSegment]:
     """
-    使用LLM拆分句子
-
-    示例：
-    segments = [ASRDataSeg("Hello"), ASRDataSeg("world!")]
-    result = [ASRDataSeg("Hello world")]
+    使用LLM处理分段
     """
     txt = "".join([seg.text for seg in segments])
     # 使用LLM拆分句子
@@ -592,35 +555,27 @@ def process_by_llm(segments: List[ASRDataSeg],
     return merged_segments
 
 
-def merge_segments(asr_data: ASRData, 
+def merge_segments(asr_data: SubtitleData, 
                    model: str = "gpt-4o-mini", 
                    num_threads: int = FIXED_NUM_THREADS, 
                    max_word_count_cjk: int = MAX_WORD_COUNT_CJK, 
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> ASRData:
+                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> SubtitleData:
     """
-    合并ASR数据分段
-    
-    Args:
-        asr_data: ASR数据对象
-        model: 使用的LLM模型名称
-        num_threads: 并行处理的线程数
-        max_word_count: 每个分段的最大字数限制，会覆盖默认值
-    Returns:
-        处理后的ASR数据对象
+    合并字幕分段
     """
     # 更新全局的MAX_WORD_COUNT
     global MAX_WORD_COUNT_CJK, MAX_WORD_COUNT_ENGLISH
     MAX_WORD_COUNT_CJK = max_word_count_cjk
     MAX_WORD_COUNT_ENGLISH = max_word_count_english
 
-    # 预处理ASR数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
+    # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
-    # logger.debug(f"预处理ASR数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
+    # logger.debug(f"预处理字幕数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
     txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
     logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
 
-    # 确定分段数，分割ASRData
+    # 确定分段数，分割字幕数据
     num_segments = determine_num_segments(total_word_count, threshold=SEGMENT_THRESHOLD)
     logger.info(f"根据字数 {total_word_count}，确定分段数: {num_segments}")
     asr_data_segments = split_asr_data(asr_data, num_segments)
@@ -652,7 +607,7 @@ def merge_segments(asr_data: ASRData,
 
     merge_short_segment(final_segments)
 
-    # 创建最终的ASRData对象
-    final_asr_data = ASRData(final_segments)
+    # 创建最终的字幕数据对象
+    final_asr_data = SubtitleData(final_segments)
 
     return final_asr_data

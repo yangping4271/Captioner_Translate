@@ -10,7 +10,7 @@ from subtitle_processor.optimizer import SubtitleOptimizer
 from subtitle_processor.summarizer import SubtitleSummarizer
 from subtitle_processor.spliter import merge_segments
 from subtitle_processor.config import SubtitleConfig, SRT_SUFFIX, OUTPUT_SUFFIX, EN_OUTPUT_SUFFIX, get_default_config
-from bk_asr.ASRData import from_subtitle_file, ASRData, ASRDataSeg
+from subtitle_processor.data import load_subtitle, SubtitleData
 from utils.test_opanai import test_openai
 from utils.logger import setup_logger
 
@@ -30,7 +30,7 @@ class SubtitleTranslator:
             self._init_translation_env(llm_model)
             
             # 加载字幕文件
-            asr_data = from_subtitle_file(input_file)
+            asr_data = load_subtitle(input_file)
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
@@ -72,14 +72,14 @@ class SubtitleTranslator:
         logger.info(f"使用 {self.config.openai_base_url} 作为API端点")
         logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
 
-    def _get_subtitle_summary(self, asr_data: ASRData) -> Dict:
+    def _get_subtitle_summary(self, asr_data: SubtitleData) -> Dict:
         """获取字幕内容摘要"""
         logger.info(f"正在使用 {self.config.llm_model} 总结字幕...")
         summarize_result = self.summarizer.summarize(asr_data.to_txt())
         logger.info(f"总结字幕内容:{summarize_result}")
         return summarize_result
 
-    def _translate_subtitles(self, asr_data: ASRData, summarize_result: str, reflect: bool = False) -> List[Dict]:
+    def _translate_subtitles(self, asr_data: SubtitleData, summarize_result: str, reflect: bool = False) -> List[Dict]:
         """翻译字幕内容"""
         logger.info(f"正在使用 {self.config.llm_model} 翻译字幕...")
         try:

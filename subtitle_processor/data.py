@@ -6,19 +6,20 @@ import logging
 # 配置日志
 logger = logging.getLogger("subtitle_translator_cli")
 
-class ASRDataSeg:
+class SubtitleSegment:
+    """单个字幕段的数据结构"""
     def __init__(self, text: str, start_time: int, end_time: int):
         self.text = text
         self.start_time = start_time
         self.end_time = end_time
 
     def to_srt_ts(self) -> str:
-        """Convert to SRT timestamp format"""
+        """转换为SRT时间戳格式"""
         return f"{self._ms_to_srt_time(self.start_time)} --> {self._ms_to_srt_time(self.end_time)}"
 
     @staticmethod
     def _ms_to_srt_time(ms: int) -> str:
-        """Convert milliseconds to SRT time format (HH:MM:SS,mmm)"""
+        """将毫秒转换为SRT时间格式 (HH:MM:SS,mmm)"""
         total_seconds, milliseconds = divmod(ms, 1000)
         minutes, seconds = divmod(total_seconds, 60)
         hours, minutes = divmod(minutes, 60)
@@ -26,15 +27,16 @@ class ASRDataSeg:
 
     @property
     def transcript(self) -> str:
-        """Return segment text"""
+        """返回字幕文本"""
         return self.text
 
     def __str__(self) -> str:
-        return f"ASRDataSeg({self.text}, {self.start_time}, {self.end_time})"
+        return f"SubtitleSegment({self.text}, {self.start_time}, {self.end_time})"
 
 
-class ASRData:
-    def __init__(self, segments: List[ASRDataSeg]):
+class SubtitleData:
+    """字幕数据的主要容器类"""
+    def __init__(self, segments: List[SubtitleSegment]):
         # 去除 segments.text 为空的
         filtered_segments = [seg for seg in segments if seg.text and seg.text.strip()]
         filtered_segments.sort(key=lambda x: x.start_time)
@@ -47,7 +49,7 @@ class ASRData:
         return len(self.segments)
     
     def has_data(self) -> bool:
-        """Check if there are any utterances"""
+        """检查是否有字幕数据"""
         return len(self.segments) > 0
     
     def is_word_timestamp(self) -> bool:
@@ -71,20 +73,12 @@ class ASRData:
                 valid_segments += 1
         return (valid_segments / total_segments) >= 0.8
 
-    def save(self, save_path: str) -> None:
-        """Save the ASRData to a file"""
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        if save_path.endswith('.srt'):
-            self.to_srt(save_path=save_path)
-        else:
-            raise ValueError(f"仅支持srt格式: {save_path}")
-
     def to_txt(self) -> str:
-        """Convert to plain text"""
+        """转换为纯文本格式"""
         return "\n".join(seg.transcript for seg in self.segments)
 
     def to_srt(self, save_path=None) -> str:
-        """Convert to SRT subtitle format"""
+        """转换为SRT字幕格式"""
         srt_lines = []
         for n, seg in enumerate(self.segments, 1):
             srt_lines.append(f"{n}\n{seg.to_srt_ts()}\n{seg.transcript}\n")
@@ -96,6 +90,7 @@ class ASRData:
         return srt_text
 
     def to_json(self) -> dict:
+        """转换为JSON格式"""
         result_json = {}
         for i, segment in enumerate(self.segments, 1):
             # 检查是否有换行符
@@ -113,32 +108,29 @@ class ASRData:
         return result_json
 
     def merge_segments(self, start_index: int, end_index: int, merged_text: str = None):
-        """合并从 start_index 到 end_index 的段（包含）。"""
+        """合并从 start_index 到 end_index 的段（包含）"""
         if start_index < 0 or end_index >= len(self.segments) or start_index > end_index:
             raise IndexError("无效的段索引。")
         merged_start_time = self.segments[start_index].start_time
         merged_end_time = self.segments[end_index].end_time
         if merged_text is None:
             merged_text = ''.join(seg.text for seg in self.segments[start_index:end_index+1])
-        merged_seg = ASRDataSeg(merged_text, merged_start_time, merged_end_time)
+        merged_seg = SubtitleSegment(merged_text, merged_start_time, merged_end_time)
         # 替换 segments[start_index:end_index+1] 为 merged_seg
         self.segments[start_index:end_index+1] = [merged_seg]
 
     def merge_with_next_segment(self, index: int) -> None:
-        """合并指定索引的段与下一个段。"""
+        """合并指定索引的段与下一个段"""
         if index < 0 or index >= len(self.segments) - 1:
             raise IndexError("索引超出范围或没有下一个段可合并。")
         current_seg = self.segments[index]
         next_seg = self.segments[index + 1]
         merged_text = f"{current_seg.text} {next_seg.text}"
-        merged_seg = ASRDataSeg(merged_text, current_seg.start_time, next_seg.end_time)
+        merged_seg = SubtitleSegment(merged_text, current_seg.start_time, next_seg.end_time)
         self.segments[index] = merged_seg
         # 删除下一个段
         del self.segments[index + 1]
 
-    def __str__(self):
-        return self.to_txt()
-    
     def save_translation(self, output_path: str, subtitle_dict: Dict[int, str], operation: str = "处理") -> None:
         """
         保存翻译或优化后的字幕文件
@@ -211,14 +203,19 @@ class ASRData:
 
         logger.info("保存完成")
 
-def from_subtitle_file(file_path: str) -> 'ASRData':
-    """从文件路径加载ASRData实例
+    def __str__(self):
+        return self.to_txt()
+
+
+def load_subtitle(file_path: str) -> 'SubtitleData':
+    """
+    从文件加载字幕数据
     
     Args:
         file_path: 字幕文件路径，支持.srt格式
         
     Returns:
-        ASRData: 解析后的ASRData实例
+        SubtitleData: 解析后的字幕数据实例
         
     Raises:
         ValueError: 不支持的文件格式或文件读取错误
@@ -236,14 +233,16 @@ def from_subtitle_file(file_path: str) -> 'ASRData':
     except UnicodeDecodeError:
         content = file_path.read_text(encoding='gbk')
         
-    return from_srt(content)
+    return _parse_srt(content)
 
-def from_srt(srt_str: str) -> 'ASRData':
+def _parse_srt(srt_str: str) -> 'SubtitleData':
     """
-    从SRT格式的字符串创建ASRData实例。
+    解析SRT格式的字符串
 
-    :param srt_str: 包含SRT格式字幕的字符串。
-    :return: 解析后的ASRData实例。
+    Args:
+        srt_str: 包含SRT格式字幕的字符串
+    Returns:
+        SubtitleData: 解析后的字幕数据实例
     """
     segments = []
     srt_time_pattern = re.compile(
@@ -286,6 +285,6 @@ def from_srt(srt_str: str) -> 'ASRData':
         else:
             text = ' '.join(lines[2:])
 
-        segments.append(ASRDataSeg(text, start_time, end_time))
+        segments.append(SubtitleSegment(text, start_time, end_time))
 
-    return ASRData(segments)
+    return SubtitleData(segments) 

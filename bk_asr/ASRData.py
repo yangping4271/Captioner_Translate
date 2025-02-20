@@ -1,6 +1,10 @@
 import re
-from typing import List
+from typing import List, Dict
 from pathlib import Path
+import logging
+
+# 配置日志
+logger = logging.getLogger("subtitle_translator_cli")
 
 class ASRDataSeg:
     def __init__(self, text: str, start_time: int, end_time: int):
@@ -135,6 +139,77 @@ class ASRData:
     def __str__(self):
         return self.to_txt()
     
+    def save_translation(self, output_path: str, subtitle_dict: Dict[int, str], operation: str = "处理") -> None:
+        """
+        保存翻译或优化后的字幕文件
+        
+        Args:
+            output_path: 输出文件路径
+            subtitle_dict: 字幕内容字典，key为段落编号，value为字幕文本
+            operation: 操作类型描述，用于日志
+        """
+        # 创建输出目录（如果不存在）
+        output_dir = Path(output_path).parent
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成SRT格式的字幕内容
+        srt_lines = []
+        logger.debug(f"字幕段落数: {len(self.segments)}")
+        logger.debug(f"字幕字典内容: {subtitle_dict}")
+        for i, segment in enumerate(self.segments, 1):
+            if i not in subtitle_dict:
+                logger.warning(f"字幕 {i} 不在字典中")
+                continue
+            srt_lines.extend([
+                str(i),
+                segment.to_srt_ts(),
+                subtitle_dict[i],
+                ""  # 空行分隔
+            ])
+
+        # 写入文件
+        srt_content = "\n".join(srt_lines)
+        logger.debug(f"生成的SRT内容:\n{srt_content}")
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(srt_content)
+
+        # 检查文件是否成功保存
+        if not Path(output_path).exists():
+            raise Exception(f"字幕{operation}失败: 文件未能成功保存")
+        logger.info(f"{operation}后的字幕已保存至: {output_path}")
+
+    def save_translations(self, base_path: Path, translate_result: List[Dict], 
+                        en_suffix: str = ".en.srt", zh_suffix: str = ".zh.srt") -> None:
+        """
+        保存翻译结果，包括优化后的英文字幕和翻译后的中文字幕
+        
+        Args:
+            base_path: 基础文件路径
+            translate_result: 翻译结果列表
+            en_suffix: 英文字幕文件后缀
+            zh_suffix: 中文字幕文件后缀
+        """
+        # 构建输出文件路径
+        base_name = base_path.stem
+        output_dir = base_path.parent
+        en_path = output_dir / f"{base_name}{en_suffix}"
+        zh_path = output_dir / f"{base_name}{zh_suffix}"
+
+        logger.info("开始保存...")
+
+        # 保存优化后的英文字幕
+        optimized_subtitles = {item["id"]: item["optimized"] for item in translate_result}
+        self.save_translation(str(en_path), optimized_subtitles, "优化")
+
+        # 保存翻译后的中文字幕
+        translated_subtitles = {
+            item["id"]: item.get("revised_translation", item["translation"])
+            for item in translate_result
+        }
+        self.save_translation(str(zh_path), translated_subtitles, "翻译")
+
+        logger.info("保存完成")
 
 def from_subtitle_file(file_path: str) -> 'ASRData':
     """从文件路径加载ASRData实例
@@ -151,18 +226,17 @@ def from_subtitle_file(file_path: str) -> 'ASRData':
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f"文件不存在: {file_path}")
+    
+    # 检查文件格式
+    if not file_path.suffix.lower() == '.srt':
+        raise ValueError("仅支持srt格式字幕文件")
         
     try:
         content = file_path.read_text(encoding='utf-8')
     except UnicodeDecodeError:
         content = file_path.read_text(encoding='gbk')
         
-    suffix = file_path.suffix.lower()
-    
-    if suffix == '.srt':
-        return from_srt(content)
-    else:
-        raise ValueError(f"仅支持srt格式: {suffix}")
+    return from_srt(content)
 
 def from_srt(srt_str: str) -> 'ASRData':
     """

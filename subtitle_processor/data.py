@@ -149,14 +149,33 @@ class SubtitleData:
         srt_lines = []
         logger.debug(f"字幕段落数: {len(self.segments)}")
         logger.debug(f"字幕字典内容: {subtitle_dict}")
+        
+        # 记录有效字幕数
+        valid_subtitle_count = 0
+        
         for i, segment in enumerate(self.segments, 1):
             if i not in subtitle_dict:
                 logger.warning(f"字幕 {i} 不在字典中")
                 continue
+                
+            # 获取字幕内容，确保是字符串类型
+            subtitle_text = subtitle_dict[i]
+            if subtitle_text is None:
+                logger.warning(f"字幕 {i} 的内容为None，将被跳过")
+                continue
+                
+            # 如果字幕内容为空，跳过该字幕
+            if not subtitle_text.strip():
+                logger.debug(f"字幕 {i} 的内容为空，将被跳过")
+                continue
+                
+            # 有效字幕数加1
+            valid_subtitle_count += 1
+            
             srt_lines.extend([
-                str(i),
+                str(valid_subtitle_count),  # 使用新的编号
                 segment.to_srt_ts(),
-                subtitle_dict[i],
+                subtitle_text,
                 ""  # 空行分隔
             ])
 
@@ -169,7 +188,9 @@ class SubtitleData:
         # 检查文件是否成功保存
         if not Path(output_path).exists():
             raise Exception(f"字幕{operation}失败: 文件未能成功保存")
+            
         logger.info(f"{operation}后的字幕已保存至: {output_path}")
+        logger.info(f"总字幕数: {len(self.segments)}, 有效字幕数: {valid_subtitle_count}, 跳过字幕数: {len(self.segments) - valid_subtitle_count}")
 
     def save_translations(self, base_path: Path, translate_result: List[Dict], 
                         en_suffix: str = ".en.srt", zh_suffix: str = ".zh.srt") -> None:

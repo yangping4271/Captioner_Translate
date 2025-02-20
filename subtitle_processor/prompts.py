@@ -151,9 +151,13 @@ If provided, please prioritize the following reference information:
 [1. Subtitle Optimization (for optimized_subtitle)]
 Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
 - Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
-- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
-- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
+- Remove all non-speech and meaningless content:
+  * Interjections and fillers: "um", "uh", "like", etc.
+  * Sound effects and reactions: (beep), (laugh), (cough), laughter, coughing
+  * Scene descriptions: [Music], [Applause]
+  * Musical symbols: ♪, ♫
+- Important: When removing non-speech content, return an empty string ("") if no meaningful text remains. Never return null or None values.
+- Strictly maintain one-to-one correspondence of subtitle numbers - do not merge or split subtitles
 - If the sentence is correct, do not modify the original words, structure, and expressions.
 - Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
 
@@ -237,9 +241,13 @@ If provided, please prioritize the following reference information:
 [1. Subtitle Optimization (for optimized_subtitle)]
 Please strictly follow these rules when correcting the original subtitles to generate optimized_subtitle:
 - Only correct speech recognition errors while maintaining the original sentence structure and expression. Do not use synonyms.
-- Remove meaningless interjections (e.g., "um," "uh," "like," laughter, coughing, etc.)
-- Standardize punctuation, English capitalization, mathematical formulas, and code variable names. Use plain text to represent mathematical formulas.
-- Strictly maintain one-to-one correspondence of subtitle numbers; do not merge or split subtitles.
+- Remove all non-speech and meaningless content:
+  * Interjections and fillers: "um", "uh", "like", etc.
+  * Sound effects and reactions: (beep), (laugh), (cough), laughter, coughing
+  * Scene descriptions: [Music], [Applause]
+  * Musical symbols: ♪, ♫
+- Important: When removing non-speech content, return an empty string ("") if no meaningful text remains. Never return null or None values.
+- Strictly maintain one-to-one correspondence of subtitle numbers - do not merge or split subtitles
 - If the sentence is correct, do not modify the original words, structure, and expressions.
 - Maintain terminology consistency by ensuring terminology use reflects the source text domain and by using equivalent expressions as necessary.
 

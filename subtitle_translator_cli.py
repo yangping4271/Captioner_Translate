@@ -22,13 +22,13 @@ class SubtitleTranslator:
         self.config = get_default_config()
         self.summarizer = SubtitleSummarizer(config=self.config)
 
-    def translate(self, input_file: str, en_output: str = None, zh_output: str = None, llm_model: str = None, reflect: bool = False) -> None:
+    def translate(self, input_file: str, en_output: str, zh_output: str, llm_model: str = None, reflect: bool = False) -> None:
         """翻译字幕文件
         
         Args:
             input_file: 输入字幕文件路径
-            en_output: 英文字幕输出路径，如果为None则使用默认命名
-            zh_output: 中文字幕输出路径，如果为None则使用默认命名
+            en_output: 英文字幕输出路径
+            zh_output: 中文字幕输出路径
             llm_model: 使用的语言模型
             reflect: 是否启用反思翻译
         """
@@ -54,21 +54,6 @@ class SubtitleTranslator:
             
             # 翻译字幕
             translate_result = self._translate_subtitles(asr_data, summarize_result, reflect)
-            
-            # 如果未指定输出路径，使用默认命名
-            if en_output is None or zh_output is None:
-                base_path = Path(input_file)
-                base_name = base_path.stem
-                # 只移除末尾的 _en 或 _zh 后缀
-                if base_name.endswith('_en'):
-                    base_name = base_name[:-3]
-                elif base_name.endswith('_zh'):
-                    base_name = base_name[:-3]
-                output_dir = base_path.parent
-                if en_output is None:
-                    en_output = str(output_dir / f"{base_name}_en.srt")
-                if zh_output is None:
-                    zh_output = str(output_dir / f"{base_name}_zh.srt")
             
             # 保存字幕
             asr_data.save_translations_to_files(
@@ -122,12 +107,25 @@ def main():
     args = parser.parse_args()
 
     try:
+        # 处理文件名
+        base_path = Path(args.input_file)
+        base_name = base_path.stem
+        # 只移除末尾的 _en 或 _zh 后缀
+        if base_name.endswith('_en'):
+            base_name = base_name[:-3]
+        elif base_name.endswith('_zh'):
+            base_name = base_name[:-3]
+        output_dir = base_path.parent
+        en_output = str(output_dir / f"{base_name}_en.srt")
+        zh_output = str(output_dir / f"{base_name}_zh.srt")
+
         # 初始化翻译器并开始翻译
         translator = SubtitleTranslator()
-        base_name = Path(args.input_file).stem
         print(f"\n=================== 正在翻译 {base_name} ===================\n")
         translator.translate(
             input_file=args.input_file,
+            en_output=en_output,
+            zh_output=zh_output,
             llm_model=args.llm_model,
             reflect=args.reflect
         )

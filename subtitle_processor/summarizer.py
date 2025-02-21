@@ -30,23 +30,25 @@ class SubtitleSummarizer:
             Dict: 包含总结信息的字典
         """
         try:
-            # 使用pathlib处理文件名
+            # 使用 pathlib 处理文件名
             path = Path(input_file)
             # 获取不带扩展名的文件名
-            readable_name = path.stem.replace('_', ' ').replace('-', ' ')
+            readable_filename = path.stem.replace('_', ' ').replace('-', ' ')
 
-            logger.info(f"可读性文件名: {readable_name}")
-            
-            # 添加文件名上下文到字幕内容
-            content_with_context = (
-                f"The subtitle filename '{readable_name}' indicates this content is about {readable_name}. "
-                f"Please keep this context in mind while summarizing the following subtitles:\n\n"
-                f"{subtitle_content}"
-            )
-            
+            logger.info(f"可读性文件名: {readable_filename}")            
+            # 更新提示词，强调文件名的权威性
             message = [
-                {"role": "system", "content": SUMMARIZER_PROMPT},
-                {"role": "user", "content": content_with_context}
+                {"role": "system", "content": (
+                    "You are a precise subtitle summarizer. "
+                    "When processing proper nouns and product names:"
+                    "1. Use the filename as reference for product names"
+                    "2. Only correct terms that appear to be ASR errors based on:"
+                    "   - Similar pronunciation"
+                    "   - Context indicating they refer to the same thing"
+                    "3. Do not modify other technical terms or module names that are clearly different"
+                    f"{SUMMARIZER_PROMPT}"
+                )},
+                {"role": "user", "content": f"Filename: {readable_filename}\n\nContent:\n{subtitle_content}"}
             ]
             
             response = self.client.chat.completions.create(
@@ -59,7 +61,7 @@ class SubtitleSummarizer:
             # 返回处理后的信息，包括可读文件名
             return {
                 "summary": summary,
-                "readable_name": readable_name
+                "readable_name": readable_filename
             }
             
         except Exception as e:

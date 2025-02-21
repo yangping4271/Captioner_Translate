@@ -221,10 +221,11 @@ class SubtitleOptimizer:
         if summary_content and "readable_name" in summary_content:
             readable_name = summary_content["readable_name"]
             if readable_name:
-                filename_context = (f"\nThe subtitle filename provides important context: '{readable_name}'. "
-                                  f"This indicates the main topic and content of the video. "
-                                  f"Please use this information to better understand the context, "
-                                  f"correct potential ASR errors, and translate with appropriate terminology.\n")
+                filename_context = (
+                    f"\nIMPORTANT: The filename '{readable_name}' provides reference for product names. "
+                    f"Only correct terms that appear to be ASR errors (similar pronunciation, same context). "
+                    f"Do not modify technical terms or module names that are clearly different.\n"
+                )
 
         input_content = (f"correct the original subtitles, and translate them into {self.config.target_language}:"
                         f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
@@ -252,20 +253,90 @@ class SubtitleOptimizer:
             return
             
         logger.info("================ 字幕优化结果汇总 ================")
+
+        def is_format_change_only(original, optimized):
+            """判断是否只有格式变化（大小写和标点符号）"""
+            import string
+            # 忽略大小写和标点符号后比较
+            original_normalized = original.lower().translate(str.maketrans('', '', string.punctuation))
+            optimized_normalized = optimized.lower().translate(str.maketrans('', '', string.punctuation))
+            return original_normalized == optimized_normalized
+
+        def is_wrong_replacement(original, optimized):
+            """检测是否存在错误的替换（替换了不相关的词）"""
+            import re
+            # 提取所有单词
+            original_words = set(re.findall(r'\b\w+\b', original.lower()))
+            optimized_words = set(re.findall(r'\b\w+\b', optimized.lower()))
+            # 找出被替换的词
+            removed_words = original_words - optimized_words
+            added_words = optimized_words - original_words
+            # 如果替换前后的词没有相似性，可能是错误替换
+            if removed_words and added_words:
+                for removed in removed_words:
+                    for added in added_words:
+                        # 如果原词和新词完全不同（编辑距离过大），判定为错误替换
+                        if len(removed) > 3 and len(added) > 3 and not any(c in removed for c in added):
+                            return True
+            return False
+            
+        # 统计计数
+        format_changes = 0
+        content_changes = 0
+        wrong_changes = 0
+            
         # 按ID排序输出
-        for id_num in sorted(self.batch_logs.keys()):
+        sorted_ids = sorted(self.batch_logs.keys())
+        for i, id_num in enumerate(sorted_ids):
             log = self.batch_logs[id_num]
-            logger.info(f"字幕ID: {id_num}")
-            logger.info(f"原始: {log['original']}")
-            logger.info(f"优化: {log['optimized']}")
+            original = log['original']
+            optimized = log['optimized']
+            
+            # 判断改动类型并使用不同级别输出日志
+            if is_format_change_only(original, optimized):
+                format_changes += 1
+                logger.debug(f"字幕ID {id_num} - 格式优化:")
+                logger.debug(f"原始: {original}")
+                logger.debug(f"优化: {optimized}")
+                # 格式优化使用debug级别分隔线
+                if i < len(sorted_ids) - 1:
+                    logger.debug("-" * 50)
+            else:
+                if is_wrong_replacement(original, optimized):
+                    wrong_changes += 1
+                    logger.error(f"字幕ID {id_num} - 可能存在错误替换:")
+                    logger.error(f"原始: {original}")
+                    logger.error(f"优化: {optimized}")
+                    # 错误替换使用error级别分隔线
+                    if i < len(sorted_ids) - 1:
+                        logger.error("-" * 50)
+                else:
+                    content_changes += 1
+                    logger.info(f"字幕ID {id_num} - 内容优化:")
+                    logger.info(f"原始: {original}")
+                    logger.info(f"优化: {optimized}")
+                    # 内容优化使用info级别分隔线
+                    if i < len(sorted_ids) - 1:
+                        logger.info("-" * 50)
+
             if 'translation' in log:
-                logger.info(f"翻译: {log['translation']}")
+                # logger.debug(f"翻译: {log['translation']}")
+                pass
             if 'revised_translation' in log:
+                # 反思相关信息使用info级别
                 logger.info(f"反思建议: {log['revise_suggestions']}")
                 logger.info(f"反思后翻译: {log['revised_translation']}")
-            logger.info("-" * 50)
+                if i < len(sorted_ids) - 1:
+                    logger.info("-" * 50)
         
-        logger.info("================ 字幕优化结果结束 ================\n")
+        # 输出统计信息
+        logger.info("统计信息:")
+        logger.info(f"格式优化数量: {format_changes}")
+        logger.info(f"内容修改数量: {content_changes}")
+        if wrong_changes > 0:
+            logger.error(f"疑似错误替换数量: {wrong_changes}")
+        logger.info(f"总修改数量: {format_changes + content_changes + wrong_changes}")
+        logger.info("================ 字幕优化结果结束 ================")
         # 清空日志字典
         self.batch_logs.clear()
 

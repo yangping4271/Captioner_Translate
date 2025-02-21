@@ -50,7 +50,7 @@ class SubtitleTranslator:
                                        max_word_count_english=self.config.max_word_count_english)
             
             # 获取字幕摘要
-            summarize_result = self._get_subtitle_summary(asr_data)
+            summarize_result = self._get_subtitle_summary(asr_data, input_file)
             
             # 翻译字幕
             translate_result = self._translate_subtitles(asr_data, summarize_result, reflect)
@@ -78,11 +78,11 @@ class SubtitleTranslator:
         logger.info(f"使用 {self.config.openai_base_url} 作为API端点")
         logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
 
-    def _get_subtitle_summary(self, asr_data: SubtitleData) -> Dict:
+    def _get_subtitle_summary(self, asr_data: SubtitleData, input_file: str) -> Dict:
         """获取字幕内容摘要"""
         logger.info(f"正在使用 {self.config.llm_model} 总结字幕...")
-        summarize_result = self.summarizer.summarize(asr_data.to_txt())
-        logger.info(f"总结字幕内容:{summarize_result}")
+        summarize_result = self.summarizer.summarize(asr_data.to_txt(), input_file)
+        logger.info(f"总结字幕内容:{summarize_result.get('summary')}")
         return summarize_result
 
     def _translate_subtitles(self, asr_data: SubtitleData, summarize_result: str, reflect: bool = False) -> List[Dict]:

@@ -33,12 +33,22 @@ class SubtitleOptimizer:
         self.thread_num = self.config.thread_num
         self.batch_num = self.config.batch_size
         self.executor = ThreadPoolExecutor(max_workers=self.thread_num)
+        # 改用字典存储日志，使用ID作为键以自动去重
+        self.batch_logs = {}
 
     def translate(self, asr_data, summary_content: Dict) -> List[Dict]:
         """
         翻译字幕
+        Args:
+            asr_data: ASR识别结果
+            summary_content: 总结内容，包含summary和readable_name
+        Returns:
+            List[Dict]: 翻译结果列表
         """
         try:
+            # 清空之前的日志
+            self.batch_logs.clear()
+            
             subtitle_json = {str(k): v["original_subtitle"] 
                             for k, v in asr_data.to_json().items()}
             
@@ -63,6 +73,8 @@ class SubtitleOptimizer:
                     })
                 translated_subtitle.append(translated_text)
             
+            # 所有批次处理完成后，统一输出日志
+            self._print_all_batch_logs()
             return translated_subtitle
         finally:
             self.stop()  # 确保线程池被关闭
@@ -79,7 +91,8 @@ class SubtitleOptimizer:
             finally:
                 self.executor = None
 
-    def translate_multi_thread(self, subtitle_json: Dict[int, str], reflect: bool = False, summary_content: Dict = None):
+    def translate_multi_thread(self, subtitle_json: Dict[int, str], reflect: bool = False, 
+                             summary_content: Dict = None):
         """多线程批量翻译字幕"""
         if reflect:
             return self._batch_translate(subtitle_json, use_reflect=True, summary_content=summary_content)
@@ -90,7 +103,8 @@ class SubtitleOptimizer:
             logger.error(f"批量翻译失败，使用单条翻译：{e}")
             return self._translate_by_single(subtitle_json)
 
-    def _batch_translate(self, subtitle_json: Dict[int, str], use_reflect: bool = False, summary_content: Dict = None) -> Dict:
+    def _batch_translate(self, subtitle_json: Dict[int, str], use_reflect: bool = False, 
+                         summary_content: Dict = None) -> Dict:
         """批量翻译字幕的核心方法"""
         items = list(subtitle_json.items())[:]
         chunks = [dict(items[i:i + self.batch_num]) 
@@ -199,16 +213,30 @@ class SubtitleOptimizer:
             "translated_subtitles": translated_subtitle
         }
 
-    def _create_translate_message(self, original_subtitle: Dict[str, str], summary_content: Dict, reflect=False):
+    def _create_translate_message(self, original_subtitle: Dict[str, str], 
+                                summary_content: Dict, reflect=False):
         """创建翻译提示消息"""
+        # 从summary_content中获取处理好的可读文件名
+        filename_context = ""
+        if summary_content and "readable_name" in summary_content:
+            readable_name = summary_content["readable_name"]
+            if readable_name:
+                filename_context = (f"\nThe subtitle filename provides important context: '{readable_name}'. "
+                                  f"This indicates the main topic and content of the video. "
+                                  f"Please use this information to better understand the context, "
+                                  f"correct potential ASR errors, and translate with appropriate terminology.\n")
+
         input_content = (f"correct the original subtitles, and translate them into {self.config.target_language}:"
                         f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
+
+        if filename_context:
+            input_content = filename_context + input_content
 
         if summary_content:
             input_content += (f"\nThe following is reference material related to subtitles, based on which "
                             f"the subtitles will be corrected, optimized, and translated. Pay special attention "
                             f"to the potential misrecognitions and use them along with context to make intelligent "
-                            f"corrections:\n<prompt>{summary_content}</prompt>\n")
+                            f"corrections:\n<prompt>{summary_content.get('summary', '')}</prompt>\n")
 
         prompt = REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT
         prompt = prompt.replace("[TargetLanguage]", self.config.target_language)
@@ -218,8 +246,32 @@ class SubtitleOptimizer:
             {"role": "user", "content": input_content}
         ]
 
+    def _print_all_batch_logs(self):
+        """统一打印所有批次的日志"""
+        if not self.batch_logs:
+            return
+            
+        logger.info("================ 字幕优化结果汇总 ================")
+        # 按ID排序输出
+        for id_num in sorted(self.batch_logs.keys()):
+            log = self.batch_logs[id_num]
+            logger.info(f"字幕ID: {id_num}")
+            logger.info(f"原始: {log['original']}")
+            logger.info(f"优化: {log['optimized']}")
+            if 'translation' in log:
+                logger.info(f"翻译: {log['translation']}")
+            if 'revised_translation' in log:
+                logger.info(f"反思建议: {log['revise_suggestions']}")
+                logger.info(f"反思后翻译: {log['revised_translation']}")
+            logger.info("-" * 50)
+        
+        logger.info("================ 字幕优化结果结束 ================\n")
+        # 清空日志字典
+        self.batch_logs.clear()
+
     @retry.retry(tries=2)
-    def _reflect_translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
+    def _reflect_translate(self, original_subtitle: Dict[str, str], 
+                          summary_content: Dict) -> List[Dict]:
         """反思翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         logger.info(f"[+]正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
@@ -245,21 +297,23 @@ class SubtitleOptimizer:
             }
             translated_subtitle.append(translated_text)
 
-            # 记录优化和翻译的变化
-            if translated_text["original"] != translated_text["optimized"]:
-                logger.info("==============优化字幕=========================")
-                logger.info(f"原始字幕：{translated_text['original']}")
-                logger.info(f"优化字幕：{translated_text['optimized']}")
-            if translated_text["translation"] != translated_text["revised_translation"]:
-                logger.info("==============反思翻译=========================")
-                logger.info(f"反思建议：{translated_text['revise_suggestions']}")
-                logger.info(f"翻译后字幕：{translated_text['translation']}")
-                logger.info(f"反思后字幕：{translated_text['revised_translation']}")
+            # 收集日志而不是直接输出
+            if (translated_text["original"] != translated_text["optimized"] or 
+                translated_text["translation"] != translated_text["revised_translation"]):
+                # 使用字典存储，ID作为键
+                self.batch_logs[k] = {
+                    'original': translated_text['original'],
+                    'optimized': translated_text['optimized'],
+                    'translation': translated_text['translation'],
+                    'revised_translation': translated_text['revised_translation'],
+                    'revise_suggestions': translated_text['revise_suggestions']
+                }
 
         return translated_subtitle
 
     @retry.retry(tries=2)
-    def _translate(self, original_subtitle: Dict[str, str], summary_content: Dict) -> List[Dict]:
+    def _translate(self, original_subtitle: Dict[str, str], 
+                  summary_content: Dict) -> List[Dict]:
         """翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         logger.info(f"[+]正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
@@ -283,10 +337,13 @@ class SubtitleOptimizer:
             }
             translated_subtitle.append(translated_text)
 
-            # 记录优化的变化
+            # 收集日志而不是直接输出
             if translated_text["original"] != translated_text["optimized"]:
-                logger.info("==============优化字幕=========================")
-                logger.info(f"原始字幕：{translated_text['original']}")
-                logger.info(f"优化字幕：{translated_text['optimized']}")
+                # 使用字典存储，ID作为键
+                self.batch_logs[k] = {
+                    'original': translated_text['original'],
+                    'optimized': translated_text['optimized'],
+                    'translation': translated_text['translation']
+                }
 
         return translated_subtitle

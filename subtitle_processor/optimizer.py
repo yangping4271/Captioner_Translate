@@ -216,28 +216,13 @@ class SubtitleOptimizer:
     def _create_translate_message(self, original_subtitle: Dict[str, str], 
                                 summary_content: Dict, reflect=False):
         """创建翻译提示消息"""
-        # 从summary_content中获取处理好的可读文件名
-        filename_context = ""
-        if summary_content and "readable_name" in summary_content:
-            readable_name = summary_content["readable_name"]
-            if readable_name:
-                filename_context = (
-                    f"\nIMPORTANT: The filename '{readable_name}' provides reference for product names. "
-                    f"Only correct terms that appear to be ASR errors (similar pronunciation, same context). "
-                    f"Do not modify technical terms or module names that are clearly different.\n"
-                )
-
         input_content = (f"correct the original subtitles, and translate them into {self.config.target_language}:"
                         f"\n<input_subtitle>{str(original_subtitle)}</input_subtitle>")
 
-        if filename_context:
-            input_content = filename_context + input_content
-
         if summary_content:
             input_content += (f"\nThe following is reference material related to subtitles, based on which "
-                            f"the subtitles will be corrected, optimized, and translated. Pay special attention "
-                            f"to the potential misrecognitions and use them along with context to make intelligent "
-                            f"corrections:\n<prompt>{summary_content.get('summary', '')}</prompt>\n")
+                            f"the subtitles will be corrected, optimized, and translated:"
+                            f"\n<prompt>{summary_content.get('summary', '')}</prompt>\n")
 
         prompt = REFLECT_TRANSLATE_PROMPT if reflect else TRANSLATE_PROMPT
         prompt = prompt.replace("[TargetLanguage]", self.config.target_language)

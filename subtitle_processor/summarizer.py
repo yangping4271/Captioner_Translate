@@ -58,15 +58,12 @@ class SubtitleSummarizer:
             )
             
             summary = response.choices[0].message.content
-            # 返回处理后的信息，包括可读文件名
             return {
-                "summary": summary,
-                "readable_name": readable_filename
+                "summary": summary
             }
             
         except Exception as e:
             logger.error(f"总结字幕失败: {e}")
             return {
-                "summary": "",
-                "readable_name": ""
+                "summary": ""
             }

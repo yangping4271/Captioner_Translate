@@ -24,6 +24,7 @@ class SubtitleSummarizer:
         总结字幕内容
         """
         logger.info("开始摘要化字幕内容")
+        # subtitle_content = subtitle_content[:3000]
         message = [
             {"role": "system", "content": SUMMARIZER_PROMPT},
             {"role": "user", "content": subtitle_content}

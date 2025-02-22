@@ -1,24 +1,64 @@
+# -*- coding: utf-8 -*-
+"""
+This file contains prompts designed for an automated workflow to process English subtitles and generate bilingual (English-Chinese) subtitles.
+
+The prompts are used in the following steps of the automated process:
+1. SPLIT_SYSTEM_PROMPT: Splits English subtitles into segments optimized for translation and display in an automated manner.
+2. SUMMARIZER_PROMPT: Summarizes the content of the subtitles automatically to provide context for translation.
+3. TRANSLATE_PROMPT & REFLECT_TRANSLATE_PROMPT: Automatically optimize and translate the segmented English subtitles into Chinese.
+4. SINGLE_TRANSLATE_PROMPT: Translates individual segments or terms into Chinese automatically.
+
+The ultimate goal is to create high-quality bilingual subtitles through an automated process, ensuring accuracy, readability, and visual appeal.
+"""
+
 SPLIT_SYSTEM_PROMPT = """
-You are a subtitle segmentation expert. Your task is to break a continuous block of text into semantically coherent and appropriately sized fragments, inserting the delimiter <br> at each segmentation point. Do not modify or alter any content—only add <br> where segmentation is needed.
+You are a subtitle segmentation expert. Your task is to break a continuous block of text into semantically coherent and translation-friendly fragments, inserting the delimiter <br> at each segmentation point. Do not modify or alter any content—only add <br> where segmentation is needed.
 
 Guidelines:
-- For Asian languages (e.g., Chinese, Japanese), ensure each segment does not exceed [max_word_count_cjk] characters.
-- For English, ensure each segment does not exceed [max_word_count_english] words.
-- Each segment should be a meaningful unit with a minimum length of 10 characters, unless punctuation necessitates a shorter segment.
-- If a sentence ends with a period, consider segmenting there.
-- Use semantic analysis to determine optimal breaking points for overly long sentences.
-- Return only the segmented text with <br> as delimiters, without any additional explanation.
+1. Terminology Protection (Highest Priority)
+   - Never split identified technical terms, product names, or proper nouns
+   - Keep phrasal verbs and idiomatic expressions together
+   - Maintain the integrity of numerical expressions and units
+   - Preserve standard technical terms (e.g., "machine learning", "neural network")
+   - Keep product names and brand references intact
+
+2. Semantic Coherence
+   - Keep dependent clauses with their main clause
+   - Preserve subject-verb-object relationships
+   - Keep conditional (if-then) and causal (because-therefore) relationships intact
+   - Maintain the integrity of quoted speech
+   - Preserve parenthetical expressions within their context
+
+3. Length Constraints
+   - For English: maximum [max_word_count_english] words per segment
+   - Prefer breaking at natural pause points (periods, semicolons, commas)
+   - Split long sentences at coordinating conjunctions when possible
+   - Balance segment lengths for better readability
+
+4. Context Awareness
+   - Consider the relationship between adjacent segments
+   - Avoid splitting reference relationships (e.g., "this", "that", "these")
+   - Keep topic-comment structures together when possible
+   - Maintain the flow of dialogue or presentation
+   - Preserve the context of technical explanations
 
 ## Examples
-Input (Asian language):
-大家好今天我们带来的3d创意设计作品是禁制演示器我是来自中山大学附属中学的方若涵我是陈欣然我们这一次作品介绍分为三个部分第一个部分提出问题第二个部分解决方案第三个部分作品介绍当我们学习进制的时候难以掌握老师教学也比较抽象那有没有一种教具或演示器可以将进制的原理形象生动地展现出来
+Input (Technical Content):
+The new large language model features improved context handling and supports multi-modal inputs including text images and audio while maintaining backward compatibility with existing APIs and frameworks
 Output:
-大家好<br>今天我们带来的3d创意设计作品是<br>禁制演示器<br>我是来自中山大学附属中学的方若涵<br>我是陈欣然<br>我们这一次作品介绍分为三个部分<br>第一个部分提出问题<br>第二个部分解决方案<br>第三个部分作品介绍<br>当我们学习进制的时候难以掌握<br>老师教学也比较抽象<br>那有没有一种教具或演示器<br>可以将进制的原理形象生动地展现出来
+The new large language model features improved context handling<br>and supports multi-modal inputs including text, images and audio<br>while maintaining backward compatibility with existing APIs and frameworks
 
-Input (English):
-the upgraded claude sonnet is now available for all users developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud's vertex ai the new claude haiku will be released later this month
+Input (Presentation):
+today I'll demonstrate how our machine learning pipeline processes data first we'll look at the data preprocessing step then move on to model training and finally examine the evaluation metrics in detail
 Output:
-the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta<br>on the anthropic api amazon bedrock and google cloud's vertex ai<br>the new claude haiku will be released later this month
+today I'll demonstrate how our machine learning pipeline processes data<br>first we'll look at the data preprocessing step<br>then move on to model training<br>and finally examine the evaluation metrics in detail
+
+Input (Mixed Content):
+ChatGPT and GPT-4 are both based on transformer architecture but GPT-4 has significantly improved capabilities in areas like reasoning and coding while maintaining high performance in natural language processing tasks
+Output:
+ChatGPT and GPT-4 are both based on transformer architecture<br>but GPT-4 has significantly improved capabilities in areas like reasoning and coding<br>while maintaining high performance in natural language processing tasks
+
+Return only the segmented text with <br> as delimiters, without any additional explanation.
 """
 
 SUMMARIZER_PROMPT = """

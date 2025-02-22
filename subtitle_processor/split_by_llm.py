@@ -33,12 +33,21 @@ def post_process_segments(segments: List[str]) -> List[str]:
     对LLM返回的分段结果进行后处理
     - 检查句号后跟空格的情况
     - 在需要的地方进行额外的分割
+    
+    Args:
+        segments: LLM返回的初始分段列表
+        
+    Returns:
+        List[str]: 后处理后的分段列表
     """
+    logger.debug(f"开始后处理分段，输入段数：{len(segments)}")
     result = []
+    
     for segment in segments:
         # 查找所有的句号+空格模式
         parts = re.split(r'(\. )', segment)
         current_part = ""
+        split_parts = []  # 用于收集当前segment的所有拆分部分
         
         for i, part in enumerate(parts):
             current_part += part
@@ -46,13 +55,20 @@ def post_process_segments(segments: List[str]) -> List[str]:
             if part == ". " and i < len(parts) - 1:
                 # 确保当前部分不为空再添加
                 if current_part.strip():
+                    split_parts.append(current_part.strip())
                     result.append(current_part.strip())
                 current_part = ""
         
         # 添加最后剩余的部分
         if current_part.strip():
+            split_parts.append(current_part.strip())
             result.append(current_part.strip())
+            
+        # 如果这个segment被拆分了，记录日志
+        if len(split_parts) > 1:
+            logger.info(f"句号+空格拆分处理:\n原句: {segment}\n拆分为: {' | '.join(split_parts)}")
     
+    logger.debug(f"后处理完成，输出段数：{len(result)}")
     return result
 
 def split_by_llm(text: str, 

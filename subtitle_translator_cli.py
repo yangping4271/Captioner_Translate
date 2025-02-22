@@ -50,7 +50,6 @@ class SubtitleTranslator:
                 logger.info(f"正在使用{model}断句...")
                 asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 
-                                       max_word_count_cjk=self.config.max_word_count_cjk, 
                                        max_word_count_english=self.config.max_word_count_english,
                                        save_split=save_split)
             

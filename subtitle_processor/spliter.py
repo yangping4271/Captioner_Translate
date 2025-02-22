@@ -1,5 +1,4 @@
 import difflib
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
@@ -16,7 +15,6 @@ SPLIT_RANGE = 30  # 在分割点前后寻找最大时间间隔的范围
 MAX_GAP = 1500  # 允许每个词语之间的最大时间间隔 ms
 
 MAX_WORD_COUNT_ENGLISH = 15  # 英文最大单词数
-MAX_WORD_COUNT_CJK = 20     # 中日韩文字最大字数
 
 class SubtitleProcessError(Exception):
     """字幕处理相关的异常"""
@@ -175,35 +173,6 @@ def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences
     return new_segments
 
 
-def is_mainly_cjk(text: str) -> bool:
-    """
-    判断文本是否主要由中日韩文字组成
-    
-    Args:
-        text: 输入文本
-    Returns:
-        bool: 如果CJK字符占比超过50%则返回True
-    """
-    # 定义CJK字符的Unicode范围
-    cjk_patterns = [
-        r'[\u4e00-\u9fff]',           # 中日韩统一表意文字
-        r'[\u3040-\u309f]',           # 平假名
-        r'[\u30a0-\u30ff]',           # 片假名
-        r'[\uac00-\ud7af]',           # 韩文音节
-    ]
-    
-    # 计算CJK字符数
-    cjk_count = 0
-    for pattern in cjk_patterns:
-        cjk_count += len(re.findall(pattern, text))
-    
-    # 计算总字符数（不包括空白字符）
-    total_chars = len(''.join(text.split()))
-    
-    # 如果CJK字符占比超过50%，则认为主要是CJK文本
-    return cjk_count / total_chars > 0.5 if total_chars > 0 else False
-
-
 def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSegment]:
     """
     基于最大时间间隔拆分长分段，根据文本类型使用不同的最大词数限制
@@ -218,7 +187,7 @@ def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSeg
     merged_text = ' '.join(seg.text.strip() for seg in segs_to_merge)
 
     # 根据文本类型确定最大词数限制
-    max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(merged_text) else MAX_WORD_COUNT_ENGLISH
+    max_word_count = MAX_WORD_COUNT_ENGLISH
     # logger.debug(f"正在拆分分段: {merged_text}")
 
     # 基本情况：如果分段足够短或无法进一步拆分
@@ -329,8 +298,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
         current_words = count_words(current_seg.text)
         next_words = count_words(next_seg.text)
         total_words = current_words + next_words
-        max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(current_seg.text) else MAX_WORD_COUNT_ENGLISH
-
+        max_word_count = MAX_WORD_COUNT_ENGLISH
 
         if time_gap < 300 and (current_words < 5 or next_words <= 5) and total_words <= max_word_count and "." not in current_seg.text:
             # 执行合并操作
@@ -483,8 +451,7 @@ def merge_common_words(segments: List[SubtitleSegment]) -> List[List[SubtitleSeg
     
     for i, seg in enumerate(segments):
         # 如果当前词是前缀词且前面已经累积了至少7个词
-        # logger.debug(seg.text)
-        max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk(seg.text) else MAX_WORD_COUNT_ENGLISH
+        max_word_count = MAX_WORD_COUNT_ENGLISH
         if any(seg.text.lower().startswith(word) for word in prefix_split_words) and len(current_group) >= int(max_word_count*0.6):
             # 合并当前组并添加到结果
             result.append(current_group)
@@ -508,47 +475,15 @@ def merge_common_words(segments: List[SubtitleSegment]) -> List[List[SubtitleSeg
     return result
 
 
-def process_by_rules(segments: List[SubtitleSegment]) -> List[SubtitleSegment]:
-    """
-    使用规则处理分段
-    """
-    logger.info(f"分段: {len(segments)}")
-    # 1. 先按时间间隔分组
-    segment_groups = merge_by_time_gaps(segments, max_gap=500, check_large_gaps=True)
-    logger.info(f"按时间间隔分组分组: {len(segment_groups)}")
-
-    # ====接下来遍历每个分组====
-    # 2. 按常用词分割, 只处理长句
-    common_result_groups = []
-    for group in segment_groups:
-        # logger.debug("".join(seg.text for seg in group))
-        max_word_count = MAX_WORD_COUNT_CJK if is_mainly_cjk("".join(seg.text for seg in group)) else MAX_WORD_COUNT_ENGLISH
-        if count_words("".join(seg.text for seg in group)) > max_word_count:    
-            segments = merge_common_words(group)
-            common_result_groups.extend(segments)
-        else:
-            common_result_groups.append(group)
-
-    result_segments = []
-    # 3. 处理过长的分段，并合并group为seg
-    for group in common_result_groups:
-        result_segments.extend(split_long_segment(group))
-    
-    return result_segments
-
-
 def process_by_llm(segments: List[SubtitleSegment], 
                    model: str = "gpt-4o-mini",
-                   max_word_count_cjk: int = MAX_WORD_COUNT_CJK,
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH,
-                   save_split: str = None) -> List[SubtitleSegment]:
+                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> List[SubtitleSegment]:
     """
     使用LLM处理分段
     
     Args:
         segments: 字幕分段列表
         model: 使用的语言模型
-        max_word_count_cjk: 中文最大字数
         max_word_count_english: 英文最大单词数
         save_split: 保存断句结果的文件路径
         
@@ -559,7 +494,6 @@ def process_by_llm(segments: List[SubtitleSegment],
     # 使用LLM拆分句子
     sentences = split_by_llm(txt, 
                            model=model, 
-                           max_word_count_cjk=max_word_count_cjk,
                            max_word_count_english=max_word_count_english)
     logger.info(f"分段的句子提取完成，共 {len(sentences)} 句")
     # 对当前分段进行合并处理
@@ -570,7 +504,6 @@ def process_by_llm(segments: List[SubtitleSegment],
 def merge_segments(asr_data: SubtitleData, 
                    model: str = "gpt-4o-mini", 
                    num_threads: int = FIXED_NUM_THREADS, 
-                   max_word_count_cjk: int = MAX_WORD_COUNT_CJK, 
                    max_word_count_english: int = MAX_WORD_COUNT_ENGLISH,
                    save_split: str = None) -> SubtitleData:
     """
@@ -580,13 +513,11 @@ def merge_segments(asr_data: SubtitleData,
         asr_data: 字幕数据
         model: 使用的语言模型
         num_threads: 线程数量
-        max_word_count_cjk: 中文最大字数
         max_word_count_english: 英文最大单词数
         save_split: 保存断句结果的文件路径
     """
     # 更新全局的MAX_WORD_COUNT
-    global MAX_WORD_COUNT_CJK, MAX_WORD_COUNT_ENGLISH
-    MAX_WORD_COUNT_CJK = max_word_count_cjk
+    global MAX_WORD_COUNT_ENGLISH
     MAX_WORD_COUNT_ENGLISH = max_word_count_english
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
@@ -606,10 +537,9 @@ def merge_segments(asr_data: SubtitleData,
         def process_segment(asr_data_part):
             try:
                 # raise Exception("test")
-                return process_by_llm(asr_data_part.segments, model=model, save_split=save_split)
+                return process_by_llm(asr_data_part.segments, model=model)
             except Exception as e:
-                logger.warning(f"LLM处理失败，使用规则based方法进行分割: {str(e)}")
-                return process_by_rules(asr_data_part.segments)
+                raise Exception(f"LLM处理失败: {str(e)}")
 
         # 并行处理所有分段
         processed_segments = list(executor.map(process_segment, asr_data_segments))
@@ -629,18 +559,15 @@ def merge_segments(asr_data: SubtitleData,
             # 获取所有处理后的分段文本
             all_segments = [seg.text for seg in final_segments]
             
-            # 保存结果
-            from .data import save_split_results
-            save_split_results(all_text, all_segments, save_split)
-            
             # 显示断句结果
             logger.info(f"所有分段断句完成，共 {len(all_segments)} 句")
             for i, segment in enumerate(all_segments, 1):
                 logger.info(f"第 {i} 句: {segment}")
             
-            # 显示保存成功信息
-            if os.path.exists(save_split):
-                logger.info(f"断句结果已保存到: {save_split}")
+            # 保存结果
+            from .data import save_split_results
+            save_split_results(all_text, all_segments, save_split)
+
         except Exception as e:
             logger.error(f"保存断句结果失败: {str(e)}")
 

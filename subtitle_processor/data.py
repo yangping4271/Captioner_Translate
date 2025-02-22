@@ -1,4 +1,5 @@
 import re
+import os
 from typing import List, Dict
 from pathlib import Path
 import logging
@@ -363,8 +364,13 @@ def save_split_results(text: str, split_results: List[str], output_path: str) ->
             f.write("原始文本:\n")
             f.write(text + "\n\n")
             f.write("断句结果:\n")
-            for segment in split_results:
-                f.write(f"{segment}\n")
+            for i, segment in enumerate(split_results):
+                f.write(f"{segment}")
+                if i < len(split_results) - 1:  # 确保不是最后一个分段
+                    f.write("<br>")
+        # 显示保存成功信息
+        if os.path.exists(output_path):
+            logger.info(f"断句结果已保存到: {output_path}")
     except Exception as e:
         logger.error(f"保存断句结果失败: {str(e)}")
         raise 

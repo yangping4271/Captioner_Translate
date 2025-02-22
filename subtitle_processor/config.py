@@ -17,8 +17,7 @@ class SubtitleConfig:
     temperature: float = 0.7
     
     # 字幕分段配置
-    max_word_count_cjk: int = 18
-    max_word_count_english: int = 14
+    max_word_count_english: int = 18
     segment_threshold: int = 500  # 每个分段的最大字数
     split_range: int = 30  # 在分割点前后寻找最大时间间隔的范围
     max_gap: int = 1500  # 允许每个词语之间的最大时间间隔 ms
@@ -28,7 +27,6 @@ class SubtitleConfig:
     minimum_alignment_ratio: float = 0.6
     
     # 功能开关
-    cjk_only: bool = True
     need_reflect: bool = False
     
     def __post_init__(self):

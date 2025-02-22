@@ -12,21 +12,17 @@ logger = setup_logger("subtitle_spliter")
 
 def count_words(text: str) -> int:
     """
-    统计混合文本中英文单词数和中文字符数的总和
-    
+    统计文本中英文单词数
     Args:
-        text: 输入文本，可以包含中英文
-        
+        text: 输入文本，英文
     Returns:
-        int: 中文字符数与英文单词数的总和
+        int: 英文单词数
     """
     logger.debug(f"开始统计文本字数，文本长度：{len(text)}")
-    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
     english_text = re.sub(r'[\u4e00-\u9fff]', ' ', text)
     english_words = len(english_text.strip().split())
-    total = english_words + chinese_chars
-    logger.debug(f"字数统计结果：中文字符 {chinese_chars}，英文单词 {english_words}，总计 {total}")
-    return total
+    logger.debug(f"字数统计结果：英文单词 {english_words}")
+    return english_words
 
 def post_process_segments(segments: List[str]) -> List[str]:
     """
@@ -73,7 +69,6 @@ def post_process_segments(segments: List[str]) -> List[str]:
 
 def split_by_llm(text: str, 
                  model: str = None, 
-                 max_word_count_cjk: int = None,
                  max_word_count_english: int = None) -> List[str]:
     """
     包装 split_by_llm_retry 函数，确保在重试全部失败后返回原文本
@@ -81,7 +76,6 @@ def split_by_llm(text: str,
     Args:
         text: 要分段的文本
         model: 使用的LLM模型，如果为None则使用配置中的默认值
-        max_word_count_cjk: 中文最大字数，如果为None则使用配置中的默认值
         max_word_count_english: 英文最大单词数，如果为None则使用配置中的默认值
         
     Returns:
@@ -89,13 +83,12 @@ def split_by_llm(text: str,
     """
     config = SubtitleConfig()
     model = model or config.llm_model
-    max_word_count_cjk = max_word_count_cjk or config.max_word_count_cjk
     max_word_count_english = max_word_count_english or config.max_word_count_english
     
-    logger.debug(f"开始文本分段处理：模型 {model}，中文限制 {max_word_count_cjk}，英文限制 {max_word_count_english}")
+    logger.debug(f"开始文本分段处理：模型 {model}，英文限制 {max_word_count_english}")
     
     try:
-        return split_by_llm_retry(text, model, max_word_count_cjk, max_word_count_english)
+        return split_by_llm_retry(text, model, max_word_count_english)
     except Exception as e:
         logger.error(f"文本分段失败，将返回原文本: {str(e)}")
         return [text]
@@ -103,7 +96,6 @@ def split_by_llm(text: str,
 @retry.retry(tries=2)
 def split_by_llm_retry(text: str, 
                       model: str,
-                      max_word_count_cjk: int,
                       max_word_count_english: int) -> List[str]:
     """
     使用LLM进行文本断句
@@ -111,7 +103,6 @@ def split_by_llm_retry(text: str,
     Args:
         text: 要分段的文本
         model: 使用的LLM模型
-        max_word_count_cjk: 中文最大字数
         max_word_count_english: 英文最大单词数
         
     Returns:
@@ -124,8 +115,7 @@ def split_by_llm_retry(text: str,
     logger.debug(f"输入文本: {text}")
     
     # 准备提示词
-    system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_cjk]", str(max_word_count_cjk))
-    system_prompt = system_prompt.replace("[max_word_count_english]", str(max_word_count_english))
+    system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_english]", str(max_word_count_english))
     user_prompt = f"Please use multiple <br> tags to separate the following sentence:\n{text}"
     
     # 初始化客户端
@@ -161,7 +151,7 @@ def split_by_llm_retry(text: str,
         
         # 验证结果
         word_count = count_words(text)
-        expected_segments = word_count / max_word_count_cjk
+        expected_segments = word_count / max_word_count_english
         actual_segments = len(split_result)
         logger.debug(f"断句完成：预期段数 {expected_segments:.1f}，实际段数 {actual_segments}")
         

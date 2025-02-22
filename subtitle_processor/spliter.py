@@ -309,7 +309,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             logger.debug(f"next_seg: {next_seg.text}")
             logger.debug(f"next_words: {next_words}")
             logger.debug(f"total_words: {total_words}")
-            logger.info(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {time_gap}")
+            logger.debug(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {time_gap}")
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
             logger.debug(f"合并后: {current_seg.text}")
@@ -565,8 +565,8 @@ def merge_segments(asr_data: SubtitleData,
                 logger.info(f"第 {i} 句: {segment}")
             
             # 保存结果
-            from .data import save_split_results
-            save_split_results(all_text, all_segments, save_split)
+            # from .data import save_split_results
+            # save_split_results(all_text, all_segments, save_split)
 
         except Exception as e:
             logger.error(f"保存断句结果失败: {str(e)}")

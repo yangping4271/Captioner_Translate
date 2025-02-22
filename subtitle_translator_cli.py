@@ -22,7 +22,9 @@ class SubtitleTranslator:
         self.config = get_default_config()
         self.summarizer = SubtitleSummarizer(config=self.config)
 
-    def translate(self, input_file: str, en_output: str, zh_output: str, llm_model: str = None, reflect: bool = False) -> None:
+    def translate(self, input_file: str, en_output: str, zh_output: str, 
+                 llm_model: str = None, reflect: bool = False, 
+                 save_split: Optional[str] = None) -> None:
         """翻译字幕文件
         
         Args:
@@ -31,6 +33,7 @@ class SubtitleTranslator:
             zh_output: 中文字幕输出路径
             llm_model: 使用的语言模型
             reflect: 是否启用反思翻译
+            save_split: 保存断句结果的文件路径
         """
         try:
             logger.info("字幕处理任务开始...")     
@@ -39,6 +42,7 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
+            # logger.info(f"字幕内容: {asr_data.to_txt()}")
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
@@ -47,7 +51,8 @@ class SubtitleTranslator:
                 asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 
                                        max_word_count_cjk=self.config.max_word_count_cjk, 
-                                       max_word_count_english=self.config.max_word_count_english)
+                                       max_word_count_english=self.config.max_word_count_english,
+                                       save_split=save_split)
             
             # 获取字幕摘要
             summarize_result = self._get_subtitle_summary(asr_data, input_file)
@@ -118,6 +123,9 @@ def main():
         output_dir = base_path.parent
         en_output = str(output_dir / f"{base_name}_en.srt")
         zh_output = str(output_dir / f"{base_name}_zh.srt")
+        
+        # 设置断句结果保存路径
+        split_output = str(output_dir / f"{base_name}.txt") 
 
         # 初始化翻译器并开始翻译
         translator = SubtitleTranslator()
@@ -127,7 +135,8 @@ def main():
             en_output=en_output,
             zh_output=zh_output,
             llm_model=args.llm_model,
-            reflect=args.reflect
+            reflect=args.reflect,
+            save_split=split_output
         )
     except Exception as e:
         logger.error(f"发生错误: {str(e)}")

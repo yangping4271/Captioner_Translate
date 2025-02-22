@@ -74,8 +74,22 @@ class SubtitleData:
         return (valid_segments / total_segments) >= 0.8
 
     def to_txt(self) -> str:
-        """转换为纯文本格式"""
-        return "\n".join(seg.transcript for seg in self.segments)
+        """
+        转换为纯文本格式
+        - 正确处理标点符号（不在标点前加空格）
+        - 保持单词之间的空格
+        """
+        # 过滤掉音效标记，并获取所有文本
+        texts = []
+        for seg in self.segments:
+            text = seg.text.strip()
+            # 如果是标点符号，不需要前导空格
+            if text and not text[0].isalnum() and texts:
+                texts[-1] = texts[-1].rstrip()
+            texts.append(text)
+        
+        # 使用空格连接所有文本
+        return ' '.join(texts).strip()
 
     def to_srt(self, save_path=None) -> str:
         """转换为SRT字幕格式"""
@@ -333,4 +347,24 @@ def _parse_srt(srt_str: str) -> 'SubtitleData':
 
         segments.append(SubtitleSegment(text, start_time, end_time))
 
-    return SubtitleData(segments) 
+    return SubtitleData(segments)
+
+def save_split_results(text: str, split_results: List[str], output_path: str) -> None:
+    """
+    保存原文本和断句结果到文件。
+    
+    Args:
+        text: 原始文本
+        split_results: 断句结果列表
+        output_path: 输出文件路径
+    """
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write("原始文本:\n")
+            f.write(text + "\n\n")
+            f.write("断句结果:\n")
+            for segment in split_results:
+                f.write(f"{segment}\n")
+    except Exception as e:
+        logger.error(f"保存断句结果失败: {str(e)}")
+        raise 

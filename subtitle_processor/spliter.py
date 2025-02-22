@@ -1,4 +1,5 @@
 import difflib
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
@@ -539,16 +540,27 @@ def process_by_rules(segments: List[SubtitleSegment]) -> List[SubtitleSegment]:
 def process_by_llm(segments: List[SubtitleSegment], 
                    model: str = "gpt-4o-mini",
                    max_word_count_cjk: int = MAX_WORD_COUNT_CJK,
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> List[SubtitleSegment]:
+                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH,
+                   save_split: str = None) -> List[SubtitleSegment]:
     """
     使用LLM处理分段
+    
+    Args:
+        segments: 字幕分段列表
+        model: 使用的语言模型
+        max_word_count_cjk: 中文最大字数
+        max_word_count_english: 英文最大单词数
+        save_split: 保存断句结果的文件路径
+        
+    Returns:
+        List[SubtitleSegment]: 处理后的字幕分段列表
     """
     txt = "".join([seg.text for seg in segments])
     # 使用LLM拆分句子
     sentences = split_by_llm(txt, 
-                             model=model, 
-                             max_word_count_cjk=max_word_count_cjk,
-                             max_word_count_english=max_word_count_english)
+                           model=model, 
+                           max_word_count_cjk=max_word_count_cjk,
+                           max_word_count_english=max_word_count_english)
     logger.info(f"分段的句子提取完成，共 {len(sentences)} 句")
     # 对当前分段进行合并处理
     merged_segments = merge_segments_based_on_sentences(segments, sentences)
@@ -559,9 +571,18 @@ def merge_segments(asr_data: SubtitleData,
                    model: str = "gpt-4o-mini", 
                    num_threads: int = FIXED_NUM_THREADS, 
                    max_word_count_cjk: int = MAX_WORD_COUNT_CJK, 
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> SubtitleData:
+                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH,
+                   save_split: str = None) -> SubtitleData:
     """
     合并字幕分段
+    
+    Args:
+        asr_data: 字幕数据
+        model: 使用的语言模型
+        num_threads: 线程数量
+        max_word_count_cjk: 中文最大字数
+        max_word_count_english: 英文最大单词数
+        save_split: 保存断句结果的文件路径
     """
     # 更新全局的MAX_WORD_COUNT
     global MAX_WORD_COUNT_CJK, MAX_WORD_COUNT_ENGLISH
@@ -570,7 +591,6 @@ def merge_segments(asr_data: SubtitleData,
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
-    # logger.debug(f"预处理字幕数据完成，asr_data: {[seg.text for seg in asr_data.segments]} ")
     txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
     logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
@@ -586,7 +606,7 @@ def merge_segments(asr_data: SubtitleData,
         def process_segment(asr_data_part):
             try:
                 # raise Exception("test")
-                return process_by_llm(asr_data_part.segments, model=model)
+                return process_by_llm(asr_data_part.segments, model=model, save_split=save_split)
             except Exception as e:
                 logger.warning(f"LLM处理失败，使用规则based方法进行分割: {str(e)}")
                 return process_by_rules(asr_data_part.segments)
@@ -601,13 +621,32 @@ def merge_segments(asr_data: SubtitleData,
 
     final_segments.sort(key=lambda seg: seg.start_time)
 
-    final_txt = [seg.text for seg in final_segments]
-    logger.debug("==============最终分段=========================")
-    logger.debug(f"最终分段: {final_txt}")
+    # 如果需要保存断句结果
+    if save_split:
+        try:
+            # 获取所有文本
+            all_text = asr_data.to_txt()
+            # 获取所有处理后的分段文本
+            all_segments = [seg.text for seg in final_segments]
+            
+            # 保存结果
+            from .data import save_split_results
+            save_split_results(all_text, all_segments, save_split)
+            
+            # 显示断句结果
+            logger.info(f"所有分段断句完成，共 {len(all_segments)} 句")
+            for i, segment in enumerate(all_segments, 1):
+                logger.info(f"第 {i} 句: {segment}")
+            
+            # 显示保存成功信息
+            if os.path.exists(save_split):
+                logger.info(f"断句结果已保存到: {save_split}")
+        except Exception as e:
+            logger.error(f"保存断句结果失败: {str(e)}")
 
     merge_short_segment(final_segments)
 
+
     # 创建最终的字幕数据对象
     final_asr_data = SubtitleData(final_segments)
-
     return final_asr_data

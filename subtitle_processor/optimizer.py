@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import json
 from typing import Dict, Optional, List
 import concurrent.futures
 
@@ -54,7 +55,9 @@ class SubtitleOptimizer:
             
             # 使用多线程批量翻译
             result = self.translate_multi_thread(subtitle_json, self.need_reflect, summary_content)
-            
+
+            logger.info(f"翻译结果: {json.dumps(result, indent=4, ensure_ascii=False)}")
+
             # 转换结果格式
             translated_subtitle = []
             for k, v in result["optimized_subtitles"].items():

@@ -56,8 +56,6 @@ class SubtitleOptimizer:
             # 使用多线程批量翻译
             result = self.translate_multi_thread(subtitle_json, self.need_reflect, summary_content)
 
-            logger.info(f"翻译结果: {json.dumps(result, indent=4, ensure_ascii=False)}")
-
             # 转换结果格式
             translated_subtitle = []
             for k, v in result["optimized_subtitles"].items():
@@ -75,6 +73,8 @@ class SubtitleOptimizer:
                         "translation": result["translated_subtitles"][k].get("translation")
                     })
                 translated_subtitle.append(translated_text)
+            
+            logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
             
             # 所有批次处理完成后，统一输出日志
             self._print_all_batch_logs()

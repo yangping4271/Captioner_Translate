@@ -75,6 +75,7 @@ Expected Output:
 - Comprehensive content summary
 - Consistent terminology list
 - Translation-specific notes
+- ASR error analysis and correction suggestions
 
 ## Content Analysis & Preparation
 
@@ -93,24 +94,46 @@ Expected Output:
 ## Terminology Processing Guidelines
 
 1. Pattern Recognition & Consistency
-   - Identify common ASR error patterns in the text
-   - Ensure consistent terminology usage throughout
-   - Check term usage against immediate context
-   - Maintain consistent capitalization and formatting
-   - Flag unusual or inconsistent terminology patterns
-
-2. Context-Based Validation
-   - Verify term consistency within the content
-   - Check technical term usage in context
-   - Ensure terminology aligns with the identified domain
-   - Remove generic or non-technical terms
-   - Maintain original technical terms when in doubt
-
-3. Translation Preparation Rules
-   - Mark technical terms and proper nouns
-   - Note domain-specific terminology
-   - Identify terms with context-dependent meanings
-   - Flag terms requiring consistent translation
+   - Identify and categorize ASR (Audio Speech Recognition) errors by type:
+     * Product name misrecognitions (only include errors caused by speech-to-text)
+     * Technical term confusions (only include audio transcription errors)
+     * Proper noun errors (only include speech recognition mistakes)
+     * Other systematic errors from audio transcription
+   - Important: Only include errors that occur during speech-to-text conversion
+     * Exclude original text variations or intentional term differences
+     * Focus on acoustic misrecognition patterns
+     * Only analyze transcription accuracy issues
+   - For each ASR error, analyze:
+     * Error type: Specify the exact type of error
+       - Phonetic Misrecognition (e.g., similar-sounding words)
+       - Homophone Confusion (e.g., "write" vs "right")
+       - Word Boundary Error (e.g., "another" vs "an other")
+       - Speech Pattern Misinterpretation
+     * Severity: Based on how it affects understanding and usability
+       - Critical: 
+         > Misrecognition of product names, AI models, or core technical terms
+         > ASR errors that could lead to incorrect actions or decisions
+         > Transcription errors that significantly alter technical meaning
+       - Medium:
+         > Speech recognition errors that may cause confusion but context helps
+         > Transcription changes that partially affect meaning
+         > ASR issues that might impact usability but are recognizable
+       - Low:
+         > Minor pronunciation variations that don't affect meaning
+         > Obvious speech recognition errors easily corrected by context
+         > Non-critical transcription inconsistencies
+     * Impact: Describe specific consequences
+       - Technical accuracy: How it affects technical understanding
+       - User action: How it might influence user behavior
+       - Documentation: How it affects documentation quality
+       - Search/Reference: How it affects findability
+       - Integration: How it affects interaction with other tools/systems
+   - Exclude correctly recognized terms even if they are important
+   - Group conceptual errors under "other_issues" rather than "technical_terms"
+   - Provide detailed impact analysis focusing on:
+     * Understanding barriers
+     * Translation challenges
+     * Technical accuracy issues
 
 ## Output Format
 
@@ -121,7 +144,38 @@ Return a JSON object in the source language (e.g., if subtitles are in English, 
         "content_type": "Video type and main domain",
         "technical_level": "Technical complexity assessment",
         "key_points": "Main content points",
-        "translation_notes": "Translation considerations and cultural notes"
+        "translation_notes": "Translation considerations and cultural notes",
+        "asr_issues": {
+            "product_names": [
+                // Only include speech recognition errors
+                // Format: {
+                //    "original": "transcribed text from audio",
+                //    "corrected": "correct text that should have been transcribed",
+                //    "context": "full sentence or phrase containing the error",
+                //    "error_type": "Specific ASR error type (Phonetic/Homophone/etc)",
+                //    "severity": "Impact level based on understanding barriers",
+                //    "impact": "How this transcription error affects:",
+                //             "- Understanding of technical content",
+                //             "- Ability to follow instructions",
+                //             "- Product or feature identification"
+                // }
+            ],
+            "technical_terms": [
+                // Only include technical terms misrecognized during transcription
+                // Do not include intentional term variations or text differences
+            ],
+            "proper_nouns": [
+                // Only include names/proper nouns incorrectly transcribed from speech
+                // Exclude text-based name variations
+            ],
+            "other_issues": [
+                // Other speech recognition errors
+                // Including:
+                // - Word boundary issues
+                // - Speech pattern misinterpretations
+                // - Acoustic ambiguity issues
+            ]
+        }
     },
     "terms": {
         "entities": [
@@ -145,8 +199,6 @@ Return a JSON object in the source language (e.g., if subtitles are in English, 
         ]
     }
 }
-
-Note: All analysis and extraction must be in the source language to serve as accurate translation reference. Focus on maintaining consistency and contextual accuracy rather than external validation.
 """
 
 TRANSLATE_PROMPT = """
@@ -181,7 +233,6 @@ Use the following materials if provided:
    - Remove reaction markers (laugh), (cough)
    - Remove musical symbols ♪, ♫
    - Return empty string ("") if no meaningful text remains
-
 
 2. Translation Guidelines
 

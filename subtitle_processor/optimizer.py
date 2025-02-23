@@ -65,14 +65,14 @@ class SubtitleOptimizer:
                     "id": int(k),
                     "original": subtitle_json[str(k)],
                     "optimized": v,
-                    "translation": result["translated_subtitles"]["translated_subtitles"][k]
+                    "translation": result["translated_subtitles"][k]
                 }
                 # 如果是反思模式，添加反思相关的字段
-                if self.need_reflect and isinstance(result["translated_subtitles"]["translated_subtitles"][k], dict):
+                if self.need_reflect and isinstance(result["translated_subtitles"][k], dict):
                     translated_text.update({
-                        "revised_translation": result["translated_subtitles"]["translated_subtitles"][k].get("revised_translation"),
-                        "revise_suggestions": result["translated_subtitles"]["translated_subtitles"][k].get("revise_suggestions"),
-                        "translation": result["translated_subtitles"]["translated_subtitles"][k].get("translation")
+                        "revised_translation": result["translated_subtitles"][k].get("revised_translation"),
+                        "revise_suggestions": result["translated_subtitles"][k].get("revise_suggestions"),
+                        "translation": result["translated_subtitles"][k].get("translation")
                     })
                 translated_subtitle.append(translated_text)
             
@@ -148,9 +148,7 @@ class SubtitleOptimizer:
         
         return {
             "optimized_subtitles": optimized_subtitles,
-            "translated_subtitles": {
-                "translated_subtitles": translated_subtitles
-            }
+            "translated_subtitles": translated_subtitles
         }
 
     def _translate_by_single(self, subtitle_json: Dict[int, str]) -> Dict:
@@ -182,9 +180,7 @@ class SubtitleOptimizer:
         
         return {
             "optimized_subtitles": optimized_subtitles,
-            "translated_subtitles": {
-                "translated_subtitles": translated_subtitles
-            }
+            "translated_subtitles": translated_subtitles
         }
 
     @retry.retry(tries=2)
@@ -307,12 +303,9 @@ class SubtitleOptimizer:
                     if i < len(sorted_ids) - 1:
                         logger.info("-" * 50)
 
-            if 'translation' in log:
-                # logger.debug(f"翻译: {log['translation']}")
-                pass
             if 'revised_translation' in log:
-                # 反思相关信息使用info级别
                 logger.info(f"反思建议: {log['revise_suggestions']}")
+                logger.debug(f"翻译: {log['translation']}")
                 logger.info(f"反思后翻译: {log['revised_translation']}")
                 if i < len(sorted_ids) - 1:
                     logger.info("-" * 50)

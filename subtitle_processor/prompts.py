@@ -279,6 +279,7 @@ Return a pure JSON with the following structure:
 - few-shot -> 少样本学习
 - multi-modal -> 多模态
 - fine-tuning -> 微调
+- co-pilots -> co-pilots
 
 ## Examples
 
@@ -401,6 +402,7 @@ Return a pure JSON with the following structure:
 - few-shot -> 少样本学习
 - multi-modal -> 多模态
 - fine-tuning -> 微调
+- co-pilots -> co-pilots
 
 ## Examples
 

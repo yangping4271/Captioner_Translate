@@ -12,6 +12,7 @@ class SubtitleConfig:
     
     # 处理配置
     target_language: str = "简体中文"
+    max_word_count_english: int = 14
     thread_num: int = 18
     batch_size: int = 20
     

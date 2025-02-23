@@ -14,17 +14,6 @@ class SubtitleConfig:
     target_language: str = "简体中文"
     thread_num: int = 18
     batch_size: int = 20
-    temperature: float = 0.7
-    
-    # 字幕分段配置
-    max_word_count_english: int = 18
-    segment_threshold: int = 500  # 每个分段的最大字数
-    split_range: int = 30  # 在分割点前后寻找最大时间间隔的范围
-    max_gap: int = 1500  # 允许每个词语之间的最大时间间隔 ms
-    
-    # 对齐配置
-    similarity_threshold: float = 0.4
-    minimum_alignment_ratio: float = 0.6
     
     # 功能开关
     need_reflect: bool = False

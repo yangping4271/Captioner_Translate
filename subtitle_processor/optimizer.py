@@ -74,7 +74,7 @@ class SubtitleOptimizer:
                     })
                 translated_subtitle.append(translated_text)
             
-            logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
+            # logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
             
             # 所有批次处理完成后，统一输出日志
             self._print_all_batch_logs()

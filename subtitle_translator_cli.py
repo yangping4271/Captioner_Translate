@@ -42,11 +42,12 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
-            # logger.info(f"字幕内容: {asr_data.to_txt()}")
+            logger.debug(f"字幕内容: {asr_data.to_txt()}")
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
                 model = "gpt-4o-mini"
+                # model = self.config.llm_model14
                 logger.info(f"正在使用{model}断句...")
                 asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 

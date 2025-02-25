@@ -93,7 +93,22 @@ Expected Output:
 
 ## Terminology Processing Guidelines
 
-1. Pattern Recognition & Consistency
+1. ASR Error Definition and Criteria
+   - ASR errors are strictly defined as:
+     * Words that are acoustically misrecognized during speech-to-text conversion
+     * Terms where the transcribed text differs from what was actually spoken
+     * Cases where similar-sounding words are incorrectly substituted
+   - ASR errors must meet ALL of the following criteria:
+     * The transcribed word and correct word have phonetic similarity
+     * The error is clearly a result of speech recognition limitations
+     * The context confirms this is an incorrect transcription, not deliberate mention
+   - Explicitly NOT ASR errors:
+     * Historical name changes mentioned in content (e.g., "it changed name from X to Y")
+     * Comparisons between different tools or products
+     * Intentional references to alternative names or previous versions
+     * Different spellings or capitalizations of correctly recognized words
+
+2. Pattern Recognition & Consistency
    - Identify and categorize ASR (Audio Speech Recognition) errors by type:
      * Product name misrecognitions (only include errors caused by speech-to-text)
      * Technical term confusions (only include audio transcription errors)
@@ -103,7 +118,17 @@ Expected Output:
      * Exclude original text variations or intentional term differences
      * Focus on acoustic misrecognition patterns
      * Only analyze transcription accuracy issues
+     * Apply context-based validation:
+       > Check surrounding sentences to confirm if it's really an error
+       > Look for phrases like "changed name from", "formerly known as", "instead of"
+       > Verify if seemingly different terms are actually being compared or contrasted
+       > Confirm phonetic similarity between the transcribed and correct terms
    - For each ASR error, analyze:
+     * Validation check: 
+       - Confirm phonetic similarity exists (required condition)
+       - Ensure the error is not part of a historical reference or comparison
+       - Verify through multiple instances if possible
+       - Check if both terms appear in close proximity as distinct entities
      * Error type: Specify the exact type of error
        - Phonetic Misrecognition (e.g., similar-sounding words)
        - Homophone Confusion (e.g., "write" vs "right")
@@ -128,6 +153,15 @@ Expected Output:
        - Documentation: How it affects documentation quality
        - Search/Reference: How it affects findability
        - Integration: How it affects interaction with other tools/systems
+   - Examples of true ASR errors:
+     * "Brute" instead of "Brew" (phonetically similar)
+     * "Tomo" instead of "TOML" (phonetically similar)
+     * "Phaedantic" instead of "Pydantic" (phonetically similar)
+   
+   - Examples of NON-errors:
+     * "It changed name from Puffin to UV" (historical reference, not error)
+     * "Unlike Poetry, UV handles dependencies differently" (comparison, not error)
+     * "Some call it X, others call it Y" (alternative naming, not error)
    - Exclude correctly recognized terms even if they are important
    - Group conceptual errors under "other_issues" rather than "technical_terms"
    - Provide detailed impact analysis focusing on:
@@ -157,7 +191,8 @@ Return a JSON object in the source language (e.g., if subtitles are in English, 
                 //    "impact": "How this transcription error affects:",
                 //             "- Understanding of technical content",
                 //             "- Ability to follow instructions",
-                //             "- Product or feature identification"
+                //             "- Product or feature identification",
+                //    "validation": "Brief explanation of why this is a true ASR error, including phonetic similarity"
                 // }
             ],
             "technical_terms": [

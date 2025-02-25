@@ -562,7 +562,7 @@ def merge_segments(asr_data: SubtitleData,
             # 显示断句结果
             logger.info(f"所有分段断句完成，共 {len(all_segments)} 句")
             for i, segment in enumerate(all_segments, 1):
-                logger.info(f"第 {i} 句: {segment}")
+                logger.debug(f"第 {i} 句: {segment}")
             
             # 保存结果
             # from .data import save_split_results

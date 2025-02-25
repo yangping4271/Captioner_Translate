@@ -530,7 +530,7 @@ def merge_segments(asr_data: SubtitleData,
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
     txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
-    logger.debug(f"预处理后: {txt}")
+    # logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
 
     # 确定分段数，分割字幕数据

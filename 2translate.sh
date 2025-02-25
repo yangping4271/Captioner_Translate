@@ -15,7 +15,7 @@ fi
 echo "translating start..."
 
 echo 'Activating virtual environment...'
-source ~/Captioner_Translate/venv/bin/activate
+source ~/Captioner_Translate/.venv/bin/activate
 
 # 检查文件是否已翻译
 for file in $files; do

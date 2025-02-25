@@ -18,10 +18,10 @@ def count_words(text: str) -> int:
     Returns:
         int: 英文单词数
     """
-    logger.debug(f"开始统计文本字数，文本长度：{len(text)}")
+    # logger.debug(f"开始统计文本字数，文本长度：{len(text)}")
     english_text = re.sub(r'[\u4e00-\u9fff]', ' ', text)
     english_words = len(english_text.strip().split())
-    logger.debug(f"字数统计结果：英文单词 {english_words}")
+    # logger.debug(f"字数统计结果：英文单词 {english_words}")
     return english_words
 
 def post_process_segments(segments: List[str]) -> List[str]:
@@ -127,7 +127,7 @@ def split_by_llm_retry(text: str,
     
     try:
         # 调用API
-        logger.debug("正在调用OpenAI API...")
+        logger.debug(f"正在调用{model} API...")
         response = client.chat.completions.create(
             model=model,
             messages=[

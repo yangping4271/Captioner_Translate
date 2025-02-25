@@ -188,8 +188,8 @@ class SubtitleData:
 
         # 生成SRT格式的字幕内容
         srt_lines = []
-        logger.debug(f"字幕段落数: {len(self.segments)}")
-        logger.debug(f"字幕字典内容: {subtitle_dict}")
+        logger.debug(f"{operation}字幕段落数: {len(self.segments)}")
+        # logger.debug(f"字幕字典内容: {subtitle_dict}")
         
         # 记录有效字幕数
         valid_subtitle_count = 0
@@ -224,7 +224,7 @@ class SubtitleData:
 
         # 写入文件
         srt_content = "\n".join(srt_lines)
-        logger.debug(f"生成的SRT内容:\n{srt_content}")
+        logger.debug(f"{operation}字幕内容:\n{srt_content}")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
 

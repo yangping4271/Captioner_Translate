@@ -5,6 +5,7 @@ from typing import List
 
 from subtitle_processor.split_by_llm import split_by_llm
 from subtitle_processor.data import SubtitleData, SubtitleSegment
+from subtitle_processor.config import get_default_config
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_spliter")
@@ -13,8 +14,6 @@ SEGMENT_THRESHOLD = 500  # 每个分段的最大字数
 FIXED_NUM_THREADS = 1  # 固定的线程数量
 SPLIT_RANGE = 30  # 在分割点前后寻找最大时间间隔的范围
 MAX_GAP = 1500  # 允许每个词语之间的最大时间间隔 ms
-
-MAX_WORD_COUNT_ENGLISH = 15  # 英文最大单词数
 
 class SubtitleProcessError(Exception):
     """字幕处理相关的异常"""
@@ -187,7 +186,8 @@ def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSeg
     merged_text = ' '.join(seg.text.strip() for seg in segs_to_merge)
 
     # 根据文本类型确定最大词数限制
-    max_word_count = MAX_WORD_COUNT_ENGLISH
+    config = get_default_config()
+    max_word_count = config.max_word_count_english
     # logger.debug(f"正在拆分分段: {merged_text}")
 
     # 基本情况：如果分段足够短或无法进一步拆分
@@ -298,7 +298,8 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
         current_words = count_words(current_seg.text)
         next_words = count_words(next_seg.text)
         total_words = current_words + next_words
-        max_word_count = MAX_WORD_COUNT_ENGLISH
+        config = get_default_config()
+        max_word_count = config.max_word_count_english
 
         if time_gap < 300 and (current_words < 5 or next_words <= 5) and total_words <= max_word_count and "." not in current_seg.text:
             # 执行合并操作
@@ -451,7 +452,8 @@ def merge_common_words(segments: List[SubtitleSegment]) -> List[List[SubtitleSeg
     
     for i, seg in enumerate(segments):
         # 如果当前词是前缀词且前面已经累积了至少7个词
-        max_word_count = MAX_WORD_COUNT_ENGLISH
+        config = get_default_config()
+        max_word_count = config.max_word_count_english
         if any(seg.text.lower().startswith(word) for word in prefix_split_words) and len(current_group) >= int(max_word_count*0.6):
             # 合并当前组并添加到结果
             result.append(current_group)
@@ -477,7 +479,7 @@ def merge_common_words(segments: List[SubtitleSegment]) -> List[List[SubtitleSeg
 
 def process_by_llm(segments: List[SubtitleSegment], 
                    model: str = "gpt-4o-mini",
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH) -> List[SubtitleSegment]:
+                   max_word_count_english: int = None) -> List[SubtitleSegment]:
     """
     使用LLM处理分段
     
@@ -490,6 +492,10 @@ def process_by_llm(segments: List[SubtitleSegment],
     Returns:
         List[SubtitleSegment]: 处理后的字幕分段列表
     """
+    config = get_default_config()
+    if max_word_count_english is None:
+        max_word_count_english = config.max_word_count_english
+        
     txt = "".join([seg.text for seg in segments])
     # 使用LLM拆分句子
     sentences = split_by_llm(txt, 
@@ -504,7 +510,7 @@ def process_by_llm(segments: List[SubtitleSegment],
 def merge_segments(asr_data: SubtitleData, 
                    model: str = "gpt-4o-mini", 
                    num_threads: int = FIXED_NUM_THREADS, 
-                   max_word_count_english: int = MAX_WORD_COUNT_ENGLISH,
+                   max_word_count_english: int = None,
                    save_split: str = None) -> SubtitleData:
     """
     合并字幕分段
@@ -516,9 +522,10 @@ def merge_segments(asr_data: SubtitleData,
         max_word_count_english: 英文最大单词数
         save_split: 保存断句结果的文件路径
     """
-    # 更新全局的MAX_WORD_COUNT
-    global MAX_WORD_COUNT_ENGLISH
-    MAX_WORD_COUNT_ENGLISH = max_word_count_english
+    # 使用配置中的值
+    config = get_default_config()
+    if max_word_count_english is None:
+        max_word_count_english = config.max_word_count_english
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)

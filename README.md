@@ -66,7 +66,6 @@ LLM_MODEL=gpt-4o-mini  # 或其他支持的模型
 target_language: str = "简体中文"  # 目标语言
 thread_num: int = 18              # 并行处理线程数
 batch_size: int = 20             # 批处理大小
-max_word_count_cjk: int = 18     # 中文字幕最大字数
 max_word_count_english: int = 14  # 英文字幕最大字数
 ```
 

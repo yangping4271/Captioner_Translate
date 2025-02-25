@@ -56,6 +56,26 @@ class SubtitleOptimizer:
             # 使用多线程批量翻译
             result = self.translate_multi_thread(subtitle_json, self.need_reflect, summary_content)
 
+            # 检查是否有翻译失败的字幕（带有[翻译失败]前缀）
+            failed_subtitles = {}
+            for k, v in result["translated_subtitles"].items():
+                if isinstance(v, str) and v.startswith("[翻译失败]"):
+                    failed_subtitles[k] = subtitle_json[k]
+                elif isinstance(v, dict) and v.get("translation", "").startswith("[翻译失败]"):
+                    failed_subtitles[k] = subtitle_json[k]
+            
+            # 如果有翻译失败的字幕，使用单条翻译再次尝试
+            if failed_subtitles:
+                logger.info(f"发现{len(failed_subtitles)}个字幕翻译失败，使用单条翻译再次尝试")
+                retry_result = self._translate_chunk_by_single(failed_subtitles)
+                
+                # 更新结果
+                for k, v in retry_result["translated_subtitles"].items():
+                    if not v.startswith("[翻译失败]"):
+                        logger.info(f"字幕ID {k} 单条翻译成功")
+                        result["optimized_subtitles"][str(k)] = retry_result["optimized_subtitles"][k]
+                        result["translated_subtitles"][str(k)] = v
+
             # 转换结果格式
             translated_subtitle = []
             for k, v in result["optimized_subtitles"].items():
@@ -74,7 +94,7 @@ class SubtitleOptimizer:
                     })
                 translated_subtitle.append(translated_text)
             
-            logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
+            # logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
             
             # 所有批次处理完成后，统一输出日志
             self._print_all_batch_logs()
@@ -209,9 +229,12 @@ class SubtitleOptimizer:
         
         # 创建翻译任务
         futures = []
-        for chunk in chunks:
+        chunk_map = {}  # 用于记录future和chunk的对应关系
+        
+        for i, chunk in enumerate(chunks):
             future = self.executor.submit(self._translate_chunk_by_single, chunk)
             futures.append(future)
+            chunk_map[future] = chunk
         
         # 收集结果
         optimized_subtitles = {}
@@ -226,7 +249,12 @@ class SubtitleOptimizer:
                 logger.info(f"单条翻译进度: {i}/{total} 批次")
             except Exception as e:
                 logger.error(f"单条翻译任务失败（批次 {i}/{total}）：{e}")
-                raise
+                # 处理失败的批次，使用默认翻译
+                failed_chunk = chunk_map[future]
+                for k, v in failed_chunk.items():
+                    optimized_subtitles[str(k)] = v
+                    translated_subtitles[str(k)] = f"[翻译失败] {v}"
+                logger.warning(f"已为失败的批次 {i}/{total} 使用默认翻译")
         
         return {
             "optimized_subtitles": optimized_subtitles,
@@ -258,7 +286,14 @@ class SubtitleOptimizer:
                 logger.info(f"单条翻译结果: {translate}")
             except Exception as e:
                 logger.error(f"单条翻译失败，字幕ID: {key}，错误: {e}")
-                translated_subtitle[key] = ""
+                # 使用默认翻译，而不是空字符串，这样用户至少能看到原文
+                translated_subtitle[key] = f"[翻译失败] {value}"
+        
+        # 确保所有字幕都有翻译结果
+        for key in subtitle_chunk.keys():
+            if key not in translated_subtitle:
+                logger.warning(f"字幕ID {key} 没有翻译结果，使用默认翻译")
+                translated_subtitle[key] = f"[翻译失败] {subtitle_chunk[key]}"
         
         return {
             "optimized_subtitles": subtitle_chunk,
@@ -389,6 +424,38 @@ class SubtitleOptimizer:
                 temperature=0.7
             )
             response_content = parse_llm_response(response.choices[0].message.content)
+            
+            logger.info(f"反思翻译API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
+
+            # 检查API返回的结果是否完整
+            for k in original_subtitle.keys():
+                if not response_content or str(k) not in response_content:
+                    logger.warning(f"API返回结果缺少字幕ID: {k}，将使用原始字幕")
+                    if not response_content:
+                        response_content = {}
+                    response_content[str(k)] = {
+                        "optimized_subtitle": original_subtitle[str(k)],
+                        "translation": f"[翻译失败] {original_subtitle[str(k)]}",
+                        "revised_translation": f"[翻译失败] {original_subtitle[str(k)]}",
+                        "revise_suggestions": "翻译失败，无法提供反思建议"
+                    }
+                else:
+                    # 检查必要的字段是否存在
+                    if "optimized_subtitle" not in response_content[str(k)]:
+                        logger.warning(f"字幕ID {k} 缺少optimized_subtitle字段，将使用原始字幕")
+                        response_content[str(k)]["optimized_subtitle"] = original_subtitle[str(k)]
+                    
+                    if "translation" not in response_content[str(k)]:
+                        logger.warning(f"字幕ID {k} 缺少translation字段，将使用默认翻译")
+                        response_content[str(k)]["translation"] = f"[翻译失败] {original_subtitle[str(k)]}"
+                    
+                    if "revised_translation" not in response_content[str(k)]:
+                        logger.warning(f"字幕ID {k} 缺少revised_translation字段，将使用translation字段")
+                        response_content[str(k)]["revised_translation"] = response_content[str(k)].get("translation", f"[翻译失败] {original_subtitle[str(k)]}")
+                    
+                    if "revise_suggestions" not in response_content[str(k)]:
+                        logger.warning(f"字幕ID {k} 缺少revise_suggestions字段，将使用默认建议")
+                        response_content[str(k)]["revise_suggestions"] = "无反思建议"
 
             translated_subtitle = []
             for k, v in response_content.items():
@@ -418,7 +485,20 @@ class SubtitleOptimizer:
             return translated_subtitle
         except Exception as e:
             logger.error(f"反思翻译失败，字幕ID范围：{subtitle_keys[0]} - {subtitle_keys[-1]}，错误：{e}")
-            raise
+            # 创建默认的翻译结果
+            translated_subtitle = []
+            for k, v in original_subtitle.items():
+                k_int = int(k)
+                translated_text = {
+                    "id": k_int,
+                    "original": v,
+                    "optimized": v,
+                    "translation": f"[翻译失败] {v}",
+                    "revised_translation": f"[翻译失败] {v}",
+                    "revise_suggestions": "翻译失败，无法提供反思建议"
+                }
+                translated_subtitle.append(translated_text)
+            return translated_subtitle
 
     @retry.retry(tries=2)
     def _translate(self, original_subtitle: Dict[str, str], 
@@ -437,6 +517,23 @@ class SubtitleOptimizer:
             response_content = parse_llm_response(response.choices[0].message.content)
 
             logger.info(f"API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
+
+            # 检查API返回的结果是否完整
+            for k in original_subtitle.keys():
+                if not response_content or str(k) not in response_content:
+                    logger.warning(f"API返回结果缺少字幕ID: {k}，将使用原始字幕")
+                    if not response_content:
+                        response_content = {}
+                    response_content[str(k)] = {
+                        "optimized_subtitle": original_subtitle[str(k)],
+                        "translation": f"[翻译失败] {original_subtitle[str(k)]}"
+                    }
+                elif "optimized_subtitle" not in response_content[str(k)]:
+                    logger.warning(f"字幕ID {k} 缺少optimized_subtitle字段，将使用原始字幕")
+                    response_content[str(k)]["optimized_subtitle"] = original_subtitle[str(k)]
+                elif "translation" not in response_content[str(k)]:
+                    logger.warning(f"字幕ID {k} 缺少translation字段，将使用默认翻译")
+                    response_content[str(k)]["translation"] = f"[翻译失败] {original_subtitle[str(k)]}"
 
             translated_subtitle = []
             for k, v in response_content.items():
@@ -461,4 +558,15 @@ class SubtitleOptimizer:
             return translated_subtitle
         except Exception as e:
             logger.error(f"翻译失败，字幕ID范围：{subtitle_keys[0]} - {subtitle_keys[-1]}，错误：{e}")
-            raise
+            # 创建默认的翻译结果
+            translated_subtitle = []
+            for k, v in original_subtitle.items():
+                k_int = int(k)
+                translated_text = {
+                    "id": k_int,
+                    "original": v,
+                    "optimized": v,
+                    "translation": f"[翻译失败] {v}"
+                }
+                translated_subtitle.append(translated_text)
+            return translated_subtitle

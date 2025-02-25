@@ -774,10 +774,7 @@ def parse_llm_response(response: str) -> Dict:
         response: LLM返回的原始响应字符串
         
     Returns:
-        解析后的JSON对象
-        
-    Raises:
-        JSONDecodeError: 当JSON解析完全失败时抛出异常
+        解析后的JSON对象，如果解析失败则返回空字典
     """
     # 1. 首先尝试清理三引号并直接解析
     cleaned = clean_llm_response(response)
@@ -788,11 +785,23 @@ def parse_llm_response(response: str) -> Dict:
         try:
             return loads(cleaned)
         except Exception as e:
-            # 记录更详细的错误信息
-            error_msg = f"JSON解析失败: {str(e)}\n原始响应片段: {response[:100]}..."
-            logger.error(error_msg)
-            raise json.JSONDecodeError(
-                msg=f"无法解析LLM响应: {str(e)}", 
-                doc=response,
-                pos=0
-            ) from e
+            # 3. 尝试修复常见的JSON格式错误
+            try:
+                # 修复可能的格式问题
+                fixed_json = cleaned
+                # 修复缺少引号的键
+                fixed_json = fixed_json.replace('know.": "', 'know.": "')
+                # 修复错误的逗号
+                fixed_json = fixed_json.replace(',\n}', '\n}')
+                fixed_json = fixed_json.replace(',\n]', '\n]')
+                # 修复缺少引号的值
+                fixed_json = fixed_json.replace('": translation', '": "translation')
+                
+                # 再次尝试解析
+                return json.loads(fixed_json)
+            except Exception as e2:
+                # 4. 如果所有尝试都失败，记录错误并返回空字典
+                error_msg = f"JSON解析失败: {str(e)}\n原始响应片段: {response[:100]}..."
+                logger.error(error_msg)
+                logger.warning("返回空字典作为备选方案，请检查原始响应")
+                return {}

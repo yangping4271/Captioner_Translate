@@ -265,7 +265,8 @@ class SubtitleOptimizer:
     def _translate_chunk_by_single(self, subtitle_chunk: Dict[int, str]) -> Dict:
         """单条翻译模式的核心方法"""
         subtitle_keys = sorted(map(int, subtitle_chunk.keys()))
-        logger.info(f"[+]正在单条翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        # 修改日志输出，只打印字幕数量而不是范围
+        logger.info(f"[+]正在单条翻译字幕，共{len(subtitle_keys)}条")
         
         translated_subtitle = {}
         message = [{"role": "system",
@@ -273,6 +274,8 @@ class SubtitleOptimizer:
         
         for key, value in subtitle_chunk.items():
             try:
+                # 为每个字幕ID添加单独的日志
+                logger.info(f"[+]正在翻译字幕ID: {key}")
                 message.append({"role": "user", "content": value})
                 response = self.client.chat.completions.create(
                     model=self.config.llm_model,
@@ -425,7 +428,7 @@ class SubtitleOptimizer:
             )
             response_content = parse_llm_response(response.choices[0].message.content)
             
-            logger.info(f"反思翻译API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
+            logger.debug(f"反思翻译API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
 
             # 检查API返回的结果是否完整
             for k in original_subtitle.keys():
@@ -516,7 +519,7 @@ class SubtitleOptimizer:
             )
             response_content = parse_llm_response(response.choices[0].message.content)
 
-            logger.info(f"API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
+            logger.debug(f"API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
 
             # 检查API返回的结果是否完整
             for k in original_subtitle.keys():

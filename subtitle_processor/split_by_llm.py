@@ -47,7 +47,7 @@ def post_process_segments(segments: List[str]) -> List[str]:
         for i, part in enumerate(parts):
             current_part += part
             # 如果是句号+空格模式，且不是最后一部分
-            if part == ". " and i < len(parts) - 1:
+            if (part == ". " or part == "? " or part == "! ") and i < len(parts) - 1:
                 # 确保当前部分不为空再添加
                 if current_part.strip():
                     split_parts.append(current_part.strip())
@@ -61,7 +61,7 @@ def post_process_segments(segments: List[str]) -> List[str]:
             
         # 如果这个segment被拆分了，记录日志
         if len(split_parts) > 1:
-            logger.info(f"句号+空格拆分处理:{segment} --> {' | '.join(split_parts)}")
+            logger.info(f"拆分句子:{segment} --> {' | '.join(split_parts)}")
     
     logger.debug(f"后处理完成，输出段数：{len(result)}")
     return result

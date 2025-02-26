@@ -62,7 +62,7 @@ def post_process_segments(segments: List[str]) -> List[str]:
             
         # 如果这个segment被拆分了，记录日志
         if len(split_parts) > 1:
-            logger.info(f"句号+空格拆分处理:\n原句: {segment}\n拆分为: {' | '.join(split_parts)}")
+            logger.info(f"句号+空格拆分处理:\n\t原句: {segment}\n\t拆分为: {' | '.join(split_parts)}")
     
     logger.debug(f"后处理完成，输出段数：{len(result)}")
     return result

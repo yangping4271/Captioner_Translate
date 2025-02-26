@@ -94,7 +94,7 @@ class SubtitleOptimizer:
                     })
                 translated_subtitle.append(translated_text)
             
-            # logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
+            logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
             
             # 所有批次处理完成后，统一输出日志
             self._print_all_batch_logs()
@@ -176,15 +176,18 @@ class SubtitleOptimizer:
         chunks = [dict(items[i:i + self.batch_num]) 
                  for i in range(0, len(items), self.batch_num)]
         
+        # 记录批次信息
+        logger.info(f"开始批量翻译任务: 共{len(chunks)}个批次, 每批次最多{self.batch_num}条字幕")
+        
         # 创建翻译任务
         futures = []
         chunk_map = {}  # 用于记录future和chunk的对应关系
         
         for i, chunk in enumerate(chunks):
             if use_reflect:
-                future = self.executor.submit(self._reflect_translate, chunk, summary_content)
+                future = self.executor.submit(self._reflect_translate, chunk, summary_content, i+1, len(chunks))
             else:
-                future = self.executor.submit(self._translate, chunk, summary_content)
+                future = self.executor.submit(self._translate, chunk, summary_content, i+1, len(chunks))
             futures.append(future)
             chunk_map[future] = chunk
         
@@ -209,7 +212,7 @@ class SubtitleOptimizer:
                         }
                     else:
                         translated_subtitles[k] = item["translation"]
-                logger.info(f"批量翻译进度: {i}/{total} 批次")
+                logger.info(f"批量翻译进度: 第{i}/{total} 已完成翻译")
             except Exception as e:
                 logger.error(f"批量翻译任务失败（批次 {i}/{total}）：{e}")
                 # 记录失败的批次，而不是立即抛出异常
@@ -414,10 +417,11 @@ class SubtitleOptimizer:
 
     @retry.retry(tries=2)
     def _reflect_translate(self, original_subtitle: Dict[str, str], 
-                          summary_content: Dict) -> List[Dict]:
+                          summary_content: Dict, batch_num=None, total_batches=None) -> List[Dict]:
         """反思翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
-        logger.info(f"[+]正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
+        logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=True)
             response = self.client.chat.completions.create(
@@ -505,10 +509,11 @@ class SubtitleOptimizer:
 
     @retry.retry(tries=2)
     def _translate(self, original_subtitle: Dict[str, str], 
-                  summary_content: Dict) -> List[Dict]:
+                  summary_content: Dict, batch_num=None, total_batches=None) -> List[Dict]:
         """翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
-        logger.info(f"[+]正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
+        logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=False)
             response = self.client.chat.completions.create(

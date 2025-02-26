@@ -385,8 +385,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
 
         if time_gap < 300 and (current_words < 5 or next_words <= 5) \
             and total_words <= max_word_count \
-            and ["." not in current_seg.text, "?" not in current_seg.text, "!" not in current_seg.text] \
-            and ["." not in next_seg.text, "?" not in next_seg.text, "!" not in next_seg.text]:
+            and ("." not in current_seg.text and "?" not in current_seg.text and "!" not in current_seg.text):
             # 执行合并操作
             logger.debug("============")
             logger.debug(f"max_word_count: {max_word_count}")

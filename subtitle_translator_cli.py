@@ -48,7 +48,7 @@ class SubtitleTranslator:
             if asr_data.is_word_timestamp():
                 model = "gpt-4o-mini"
                 # model = self.config.llm_model14
-                logger.info(f"正在使用{model}断句...")
+                logger.info(f"正在使用{model}断句，英文限制{self.config.max_word_count_english}字")
                 asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 
                                        max_word_count_english=self.config.max_word_count_english,

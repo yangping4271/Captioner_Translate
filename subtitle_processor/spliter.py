@@ -493,8 +493,7 @@ def process_by_llm(segments: List[SubtitleSegment],
         List[SubtitleSegment]: 处理后的字幕分段列表
     """
     config = get_default_config()
-    if max_word_count_english is None:
-        max_word_count_english = config.max_word_count_english
+    max_word_count_english = max_word_count_english or config.max_word_count_english
         
     txt = "".join([seg.text for seg in segments])
     # 使用LLM拆分句子
@@ -535,7 +534,7 @@ def merge_segments(asr_data: SubtitleData,
 
     # 确定分段数，分割字幕数据
     num_segments = determine_num_segments(total_word_count, threshold=SEGMENT_THRESHOLD)
-    logger.info(f"根据字数 {total_word_count}，确定分段数: {num_segments}")
+    logger.info(f"根据字数 {total_word_count}，分段字数限制{SEGMENT_THRESHOLD}, 确定分段数: {num_segments}")
     asr_data_segments = split_asr_data(asr_data, num_segments)
 
     # 多线程处理每个分段

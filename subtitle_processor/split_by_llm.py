@@ -18,11 +18,9 @@ def count_words(text: str) -> int:
     Returns:
         int: 英文单词数
     """
-    # logger.debug(f"开始统计文本字数，文本长度：{len(text)}")
     english_text = re.sub(r'[\u4e00-\u9fff]', ' ', text)
-    english_words = len(english_text.strip().split())
-    # logger.debug(f"字数统计结果：英文单词 {english_words}")
-    return english_words
+    english_words = english_text.strip().split()
+    return len(english_words)
 
 def post_process_segments(segments: List[str]) -> List[str]:
     """
@@ -85,8 +83,6 @@ def split_by_llm(text: str,
     model = model or config.llm_model
     max_word_count_english = max_word_count_english or config.max_word_count_english
     
-    logger.debug(f"开始文本分段处理：模型 {model}，英文限制 {max_word_count_english}")
-    
     try:
         return split_by_llm_retry(text, model, max_word_count_english)
     except Exception as e:
@@ -111,8 +107,8 @@ def split_by_llm_retry(text: str,
     Raises:
         Exception: 当分段结果不满足要求时抛出异常
     """
-    logger.debug(f"开始处理文本，长度：{len(text)}，模型：{model}")
-    logger.debug(f"输入文本: {text}")
+    logger.info(f"开始处理文本，字数：{count_words(text)}")
+    logger.info(f"文本内容：\n{text}")
     
     # 准备提示词
     system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_english]", str(max_word_count_english))

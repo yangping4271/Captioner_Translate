@@ -94,7 +94,7 @@ class SubtitleOptimizer:
                     })
                 translated_subtitle.append(translated_text)
             
-            logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
+            # logger.info(f"翻译结果: {json.dumps(translated_subtitle, indent=4, ensure_ascii=False)}")
             
             # 所有批次处理完成后，统一输出日志
             self._print_all_batch_logs()
@@ -179,6 +179,13 @@ class SubtitleOptimizer:
         # 记录批次信息
         logger.info(f"开始批量翻译任务: 共{len(chunks)}个批次, 每批次最多{self.batch_num}条字幕")
         
+        # 检查是否达到最大线程限制
+        actual_threads = min(len(chunks), self.thread_num)
+        if actual_threads < self.thread_num:
+            logger.info(f"实际使用线程数: {actual_threads}/{self.thread_num} (字幕数量较少，未达到配置的最大线程数)")
+        else:
+            logger.info(f"实际使用线程数: {actual_threads}/{self.thread_num} (已达到配置的最大线程数)")
+        
         # 创建翻译任务
         futures = []
         chunk_map = {}  # 用于记录future和chunk的对应关系
@@ -249,7 +256,7 @@ class SubtitleOptimizer:
                 for k, v in result["optimized_subtitles"].items():
                     optimized_subtitles[str(k)] = v
                     translated_subtitles[str(k)] = result["translated_subtitles"][k]
-                logger.info(f"单条翻译进度: {i}/{total} 批次")
+                logger.info(f"单条翻译进度: 第{i}批次/{total}批次 已完成翻译")
             except Exception as e:
                 logger.error(f"单条翻译任务失败（批次 {i}/{total}）：{e}")
                 # 处理失败的批次，使用默认翻译
@@ -421,7 +428,7 @@ class SubtitleOptimizer:
         """反思翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
-        logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=True)
             response = self.client.chat.completions.create(
@@ -513,7 +520,7 @@ class SubtitleOptimizer:
         """翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
-        logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=False)
             response = self.client.chat.completions.create(

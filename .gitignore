@@ -3,6 +3,7 @@
 *.pyc
 __pycache__/
 *.env
+.cursor
 
 # 测试和临时文件
 /test/

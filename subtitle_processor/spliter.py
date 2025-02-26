@@ -234,47 +234,129 @@ def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSeg
 
 def split_asr_data(asr_data: SubtitleData, num_segments: int) -> List[SubtitleData]:
     """
-    将字幕数据分割成指定数量的段
+    将字幕数据分割成指定数量的段，确保分段时考虑字数限制和句子完整性
     """
     total_segs = len(asr_data.segments)
     total_word_count = count_words(asr_data.to_txt())
     words_per_segment = total_word_count // num_segments
-    split_indices = []
 
     if num_segments <= 1 or total_segs <= num_segments:
         return [asr_data]
 
-    # 计算每个分段的大致字数 根据每段字数计算分割点
-    split_indices = [i * words_per_segment for i in range(1, num_segments)]
-    # 调整分割点：在每个平均分割点附近寻找时间间隔最大的点
-    adjusted_split_indices = []
-    for split_point in split_indices:
-        # 定义搜索范围
-        start = max(0, split_point - SPLIT_RANGE)
-        end = min(total_segs - 1, split_point + SPLIT_RANGE)
-        # 在范围内找到时间间隔最大的点
-        max_gap = -1
-        best_index = split_point
-        for j in range(start, end):
-            gap = asr_data.segments[j + 1].start_time - asr_data.segments[j].end_time
-            if gap > max_gap:
-                max_gap = gap
+    # 获取所有段落的累计字数
+    cumulative_words = [0]
+    for i in range(total_segs):
+        words = count_words(asr_data.segments[i].text)
+        cumulative_words.append(cumulative_words[-1] + words)
+    
+    # 定义句子结束标志
+    sentence_end_markers = ['.', '!', '?', '。', '！', '？', '…']
+    
+    # 定义不应结束于此的词语
+    bad_end_words = ["and", "or", "but", "so", "yet", "for", "nor", "in", "on", "at", "to", "with", "by", "as"]
+    
+    # 计算分割点
+    split_indices = []
+    for i in range(1, num_segments):
+        target_words = i * words_per_segment
+        
+        # 找到最接近目标字数的分段索引
+        seg_index = 0
+        for j in range(total_segs):
+            if cumulative_words[j+1] >= target_words:
+                seg_index = j
+                break
+        
+        # 搜索范围：向前和向后各30个分段
+        search_range = 30
+        start_idx = max(0, seg_index - search_range)
+        end_idx = min(total_segs - 1, seg_index + search_range)
+        
+        # 寻找最佳分割点
+        best_index = seg_index
+        best_score = -1  # 分数越高越好
+        
+        for j in range(start_idx, end_idx + 1):
+            # 跳过已经选择的分割点
+            if j in split_indices:
+                continue
+                
+            # 计算与目标字数的接近程度 (负数分数，越接近0越好)
+            words_score = -abs(cumulative_words[j+1] - target_words) / 100
+            
+            # 检查是否在句子结束处 (加分)
+            ends_with_sentence = False
+            current_text = asr_data.segments[j].text.strip().lower()
+            for marker in sentence_end_markers:
+                if marker in current_text:
+                    ends_with_sentence = True
+                    break
+            
+            # 检查是否以不好的词结尾 (减分)
+            ends_with_bad_word = False
+            for word in bad_end_words:
+                if current_text.endswith(word) or current_text.endswith(word + " "):
+                    ends_with_bad_word = True
+                    break
+            
+            # 检查时间间隔 (加分)
+            time_gap = 0
+            if j < total_segs - 1:
+                time_gap = asr_data.segments[j+1].start_time - asr_data.segments[j].end_time
+            
+            # 计算总分
+            score = words_score
+            if ends_with_sentence:
+                score += 10  # 句子结束加10分
+            if ends_with_bad_word:
+                score -= 20  # 以不好的词结尾减20分
+            score += time_gap / 1000  # 时间间隔按秒加分
+            
+            # 更新最佳索引
+            if score > best_score:
+                best_score = score
                 best_index = j
-        adjusted_split_indices.append(best_index)
+                
+            # 如果找到完美的结束点，直接使用它
+            if ends_with_sentence and not ends_with_bad_word and abs(cumulative_words[j+1] - target_words) < 100:
+                best_index = j
+                break
+        
+        # 检查所选分割点是否合适
+        current_text = asr_data.segments[best_index].text.strip().lower()
+        next_text = "" if best_index + 1 >= total_segs else asr_data.segments[best_index + 1].text.strip().lower()
+        
+        # 如果该分割点结束于不好的词或者是短语的中间，尝试向前找更好的句子结束点
+        if any(current_text.endswith(word) for word in bad_end_words):
+            logger.debug(f"当前分割点以不好的词结尾: '{current_text}'，尝试调整")
+            
+            # 向前搜索更好的分割点
+            for j in range(best_index - 1, start_idx - 1, -1):
+                prev_text = asr_data.segments[j].text.strip().lower()
+                if any(marker in prev_text for marker in sentence_end_markers) and not any(prev_text.endswith(word) for word in bad_end_words):
+                    logger.debug(f"找到更好的分割点: {j}, 文本: '{prev_text}'")
+                    best_index = j
+                    break
+        
+        split_indices.append(best_index)
+    
     # 移除重复的分割点
-    adjusted_split_indices = sorted(list(set(adjusted_split_indices)))
-
-    # 根据调整后的分割点拆分ASRData
+    split_indices = sorted(list(set(split_indices)))
+    
+    # 根据分割点拆分ASRData
     segments = []
     prev_index = 0
-    for index in adjusted_split_indices:
+    for index in split_indices:
         part = SubtitleData(asr_data.segments[prev_index:index + 1])
         segments.append(part)
         prev_index = index + 1
+    
     # 添加最后一部分
     if prev_index < total_segs:
         part = SubtitleData(asr_data.segments[prev_index:])
         segments.append(part)
+    
+    logger.debug(f"最终分割成 {len(segments)} 个部分")
     return segments
 
 
@@ -523,13 +605,11 @@ def merge_segments(asr_data: SubtitleData,
     """
     # 使用配置中的值
     config = get_default_config()
-    if max_word_count_english is None:
-        max_word_count_english = config.max_word_count_english
+    max_word_count_english = max_word_count_english or config.max_word_count_english
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
     txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
-    # logger.debug(f"预处理后: {txt}")
     total_word_count = count_words(txt)
 
     # 确定分段数，分割字幕数据

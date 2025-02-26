@@ -395,10 +395,9 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             logger.debug(f"next_seg: {next_seg.text}")
             logger.debug(f"next_words: {next_words}")
             logger.debug(f"total_words: {total_words}")
-            logger.debug(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {time_gap}")
+            logger.info(f"优化：合并相邻分段: {current_seg.text} --- {next_seg.text} -> {current_seg.text + next_seg.text}")
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
-            logger.debug(f"合并后: {current_seg.text}")
             current_seg.end_time = next_seg.end_time
             
             # 从列表中移除下一个段落

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
+import re
 from typing import Dict, Optional, List
 import concurrent.futures
 
@@ -16,6 +17,43 @@ from utils.json_repair import parse_llm_response
 from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_optimizer")
+
+def is_sentence_complete(text: str) -> bool:
+    """
+    检查句子是否完整
+    
+    Args:
+        text: 要检查的文本
+        
+    Returns:
+        bool: 如果句子完整则返回True，否则返回False
+    """
+    # 句子结束标志
+    sentence_end_markers = ['.', '!', '?', '。', '！', '？', '…']
+    
+    # 不应该结束于此的词语
+    bad_end_words = ["and", "or", "but", "so", "yet", "for", "nor", "in", "on", "at", "to", "with", "by", "as"]
+    
+    # 检查是否以句子结束标志结尾
+    text = text.strip()
+    if not text:
+        return True
+        
+    # 检查最后一个字符是否是句子结束标志
+    if any(text.endswith(marker) for marker in sentence_end_markers):
+        return True
+        
+    # 检查是否以不好的词结尾
+    for word in bad_end_words:
+        if text.lower().endswith(" " + word) or text.lower() == word:
+            return False
+            
+    # 如果没有明确的结束标志，检查是否可能是不完整的句子
+    words = text.split()
+    if len(words) < 3:  # 如果句子太短，可能不完整
+        return False
+        
+    return True
 
 class SubtitleOptimizer:
     """A class for optimize and translating subtitles using OpenAI's API."""
@@ -173,11 +211,65 @@ class SubtitleOptimizer:
             tuple: (翻译结果字典, 失败批次列表)
         """
         items = list(subtitle_json.items())[:]
-        chunks = [dict(items[i:i + self.batch_num]) 
-                 for i in range(0, len(items), self.batch_num)]
+        
+        # 修改批次切分逻辑，确保每个批次的最后一句是完整的
+        chunks = []
+        i = 0
+        self._adjusted_batch_count = 0  # 初始化调整计数器
+        
+        while i < len(items):
+            # 确定当前批次的结束位置
+            end_idx = min(i + self.batch_num, len(items))
+            
+            # 如果不是最后一个批次，检查最后一句是否完整
+            if end_idx < len(items):
+                # 获取当前批次的最后一句
+                last_id, last_text = items[end_idx - 1]
+                
+                # 检查最后一句是否完整
+                if not is_sentence_complete(last_text):
+                    logger.info(f"批次结束于不完整句子: '{last_text}'，尝试调整批次边界")
+                    self._adjusted_batch_count += 1  # 增加调整计数器
+                    
+                    # 向前查找完整句子的位置
+                    complete_idx = end_idx - 1
+                    while complete_idx > i and not is_sentence_complete(items[complete_idx - 1][1]):
+                        complete_idx -= 1
+                    
+                    # 如果找到了完整句子，调整批次边界
+                    if complete_idx > i:
+                        logger.info(f"调整批次边界: {end_idx} -> {complete_idx} (确保句子完整性)")
+                        end_idx = complete_idx
+                    else:
+                        # 如果向前找不到完整句子，尝试向后查找
+                        complete_idx = end_idx
+                        while complete_idx < len(items) and not is_sentence_complete(items[complete_idx - 1][1]):
+                            complete_idx += 1
+                            
+                            # 设置一个合理的向后查找限制，避免批次过大
+                            if complete_idx - i > self.batch_num * 1.5:
+                                break
+                        
+                        if complete_idx < len(items):
+                            logger.info(f"调整批次边界: {end_idx} -> {complete_idx} (确保句子完整性)")
+                            end_idx = complete_idx
+                        else:
+                            logger.warning(f"无法找到完整句子边界，使用原始批次边界: {end_idx}")
+            
+            # 创建当前批次
+            chunk = dict(items[i:end_idx])
+            chunks.append(chunk)
+            
+            # 更新起始位置
+            i = end_idx
         
         # 记录批次信息
-        logger.info(f"开始批量翻译任务: 共{len(chunks)}个批次, 每批次最多{self.batch_num}条字幕")
+        logger.info(f"开始批量翻译任务: 预设每批次{self.batch_num}条字幕")
+        logger.info(f"共{len(chunks)}个批次, 平均{sum(len(chunk) for chunk in chunks)/len(chunks):.0f}条字幕")
+        
+        adjusted_count = getattr(self, '_adjusted_batch_count', 0)
+        if adjusted_count > 0:
+            logger.info(f"有{adjusted_count}个批次因句子不完整而进行了调整，确保句子完整性")
         
         # 检查是否达到最大线程限制
         actual_threads = min(len(chunks), self.thread_num)
@@ -428,7 +520,11 @@ class SubtitleOptimizer:
         """反思翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
-        logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
+        # 修改日志输出，当字幕数量等于预设批次大小时不显示"(共x条)"
+        if len(subtitle_keys) == self.batch_num:
+            logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        else:
+            logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=True)
             response = self.client.chat.completions.create(
@@ -520,7 +616,11 @@ class SubtitleOptimizer:
         """翻译字幕"""
         subtitle_keys = sorted(map(int, original_subtitle.keys()))
         batch_info = f"[批次 {batch_num}/{total_batches}] " if batch_num and total_batches else ""
-        logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
+        # 修改日志输出，当字幕数量等于预设批次大小时不显示"(共x条)"
+        if len(subtitle_keys) == self.batch_num:
+            logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]}")
+        else:
+            logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
         try:
             message = self._create_translate_message(original_subtitle, summary_content, reflect=False)
             response = self.client.chat.completions.create(

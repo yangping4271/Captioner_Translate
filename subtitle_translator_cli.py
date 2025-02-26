@@ -48,7 +48,8 @@ class SubtitleTranslator:
             if asr_data.is_word_timestamp():
                 model = "gpt-4o-mini"
                 # model = self.config.llm_model14
-                logger.info(f"正在使用{model}断句，英文限制{self.config.max_word_count_english}字")
+                logger.info(f"正在使用{model} 断句")
+                logger.info(f"句子限制长度为{self.config.max_word_count_english}字")
                 asr_data = merge_segments(asr_data, model=model, 
                                        num_threads=self.config.thread_num, 
                                        max_word_count_english=self.config.max_word_count_english,
@@ -81,7 +82,7 @@ class SubtitleTranslator:
             raise Exception("OpenAI API 测试失败, 请检查设置")
 
         logger.info(f"使用 {self.config.openai_base_url} 作为API端点")
-        logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
+        # logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
 
     def _get_subtitle_summary(self, asr_data: SubtitleData, input_file: str) -> Dict:
         """获取字幕内容摘要"""

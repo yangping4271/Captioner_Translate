@@ -108,8 +108,10 @@ def split_by_llm_retry(text: str,
     Raises:
         Exception: 当分段结果不满足要求时抛出异常
     """
-    logger.info(f"开始处理文本，字数：{count_words(text)}")
-    logger.info(f"文本内容：\n{text}")
+    # 获取文本的头尾部分，各100个字符
+    text_head = text[:100]
+    text_tail = text[-100:] if len(text) > 100 else ""
+    logger.info(f"处理分段，字数：{count_words(text)}, 文本：{text_head}...{text_tail}")
     
     # 准备提示词
     system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_english]", str(max_word_count_english))

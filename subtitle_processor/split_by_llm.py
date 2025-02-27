@@ -1,9 +1,7 @@
-import json
 import re
 from typing import List
 
 from openai import OpenAI
-import retry
 
 from .prompts import SPLIT_SYSTEM_PROMPT
 from .config import SubtitleConfig
@@ -23,101 +21,24 @@ def count_words(text: str) -> int:
     english_words = english_text.strip().split()
     return len(english_words)
 
-def post_process_segments(segments: List[str]) -> List[str]:
+def split_by_llm(text: str,
+                model: str = "gpt-4o-mini",
+                max_word_count_english: int = 14,
+                max_retries: int = 3) -> List[str]:
     """
-    对LLM返回的分段结果进行后处理
-    - 检查句号后跟空格的情况
-    - 在需要的地方进行额外的分割
+    使用LLM拆分句子
     
     Args:
-        segments: LLM返回的初始分段列表
-        
-    Returns:
-        List[str]: 后处理后的分段列表
-    """
-    logger.debug(f"开始后处理分段，输入段数：{len(segments)}")
-    result = []
-    
-    for segment in segments:
-        # 查找所有的句号+空格模式
-        parts = re.split(r'(\. )', segment)
-        current_part = ""
-        split_parts = []  # 用于收集当前segment的所有拆分部分
-        
-        for i, part in enumerate(parts):
-            current_part += part
-            # 如果是句号+空格模式，且不是最后一部分
-            if (part == ". " or part == "? " or part == "! ") and i < len(parts) - 1:
-                # 确保当前部分不为空再添加
-                if current_part.strip():
-                    split_parts.append(current_part.strip())
-                    result.append(current_part.strip())
-                current_part = ""
-        
-        # 添加最后剩余的部分
-        if current_part.strip():
-            split_parts.append(current_part.strip())
-            result.append(current_part.strip())
-            
-        # 如果这个segment被拆分了，记录日志
-        if len(split_parts) > 1:
-            logger.info(f"拆分句子:{segment} --> {' | '.join(split_parts)}")
-    
-    logger.debug(f"后处理完成，输出段数：{len(result)}")
-    return result
-
-def split_by_llm(text: str, 
-                 model: str = None, 
-                 max_word_count_english: int = None) -> List[str]:
-    """
-    包装 split_by_llm_retry 函数，确保在重试全部失败后返回原文本
-    
-    Args:
-        text: 要分段的文本
-        model: 使用的LLM模型，如果为None则使用配置中的默认值
-        max_word_count_english: 英文最大单词数，如果为None则使用配置中的默认值
-        
-    Returns:
-        List[str]: 分段后的文本列表
-    """
-    config = SubtitleConfig()
-    model = model or config.llm_model
-    max_word_count_english = max_word_count_english or config.max_word_count_english
-    
-    try:
-        return split_by_llm_retry(text, model, max_word_count_english)
-    except Exception as e:
-        logger.error(f"文本分段失败，将返回原文本: {str(e)}")
-        return [text]
-
-@retry.retry(tries=2)
-def split_by_llm_retry(text: str, 
-                      model: str,
-                      max_word_count_english: int) -> List[str]:
-    """
-    使用LLM进行文本断句
-    
-    Args:
-        text: 要分段的文本
-        model: 使用的LLM模型
+        text: 要拆分的文本
+        model: 使用的语言模型
         max_word_count_english: 英文最大单词数
+        max_retries: 最大重试次数
         
     Returns:
-        List[str]: 分段后的文本列表
-        
-    Raises:
-        Exception: 当分段结果不满足要求时抛出异常
+        List[str]: 拆分后的句子列表
     """
-    # 获取文本的头尾部分，各100个字符
-    text_head = text[:20]
-    text_tail = text[-20:] if len(text) > 20 else ""
-    logger.info(f"处理分段，字数：{count_words(text)}")
-    logger.info(f"文本：{text_head}...{text_tail}")
-    
-    # 准备提示词
-    system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_english]", str(max_word_count_english))
-    user_prompt = f"Please use multiple <br> tags to separate the following sentence:\n{text}"
-    
+    logger.info(f"text: {text}")
+
     # 初始化客户端
     config = SubtitleConfig()
     client = OpenAI(
@@ -125,9 +46,14 @@ def split_by_llm_retry(text: str,
         api_key=config.openai_api_key
     )
     
+    # 使用系统提示词
+    system_prompt = SPLIT_SYSTEM_PROMPT.replace("[max_word_count_english]", str(max_word_count_english))
+    
+    # 在用户提示中添加对空格的强调
+    user_prompt = f"Please use multiple <br> tags to separate the following sentence. Make sure to preserve all spaces and punctuation exactly as they appear in the original text:\n{text}"
+
     try:
         # 调用API
-        logger.debug(f"正在调用{model} API...")
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -138,28 +64,36 @@ def split_by_llm_retry(text: str,
             timeout=80
         )
         
-        # 处理返回结果
+        # 处理响应
         result = response.choices[0].message.content
-        logger.debug(f"API返回原始结果: {result}")
-        
-        # 清理和分割文本
+        if not result:
+            raise Exception("API返回为空")
+        logger.info(f"API: {result}")
+
+        # 清理和分割文本 - 简化处理，保留原始格式
         result = re.sub(r'\n+', '', result)
-        split_result = [segment.strip() for segment in result.split("<br>") if segment.strip()]
         
-        # 对分割结果进行后处理
-        split_result = post_process_segments(split_result)
+        # 直接按<br>分割，保留原始格式和空格
+        segments = result.split("<br>")
+        
+        # 清理空白行，但保留内部空格
+        segments = [seg.strip() for seg in segments if seg.strip()]
         
         # 验证结果
         word_count = count_words(text)
         expected_segments = word_count / max_word_count_english
-        actual_segments = len(split_result)
-        logger.debug(f"断句完成：预期段数 {expected_segments:.1f}，实际段数 {actual_segments}")
+        actual_segments = len(segments)
         
         if actual_segments < expected_segments * 0.9:
-            raise Exception(f"断句数量不足：预期 {expected_segments:.1f}，实际 {actual_segments}")
+            logger.warning(f"断句数量不足：预期 {expected_segments:.1f}，实际 {actual_segments}")
             
-        return split_result
+        return segments
         
     except Exception as e:
-        logger.error(f"断句处理失败: {str(e)}")
-        raise
+        if max_retries > 0:
+            logger.warning(f"API调用失败: {str(e)}，剩余重试次数: {max_retries-1}")
+            return split_by_llm(text, model, max_word_count_english, max_retries-1)
+        else:
+            logger.error(f"API调用失败，无法拆分句子: {str(e)}")
+            # 如果API调用失败，使用简单的句子拆分
+            return text.split(". ")

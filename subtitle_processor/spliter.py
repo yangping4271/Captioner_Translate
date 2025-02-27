@@ -560,8 +560,8 @@ def merge_segments(asr_data: SubtitleData,
             logger.info(f"所有分段断句完成，共 {len(all_segments)} 句")
             for i, segment in enumerate(all_segments, 1):
                 logger.debug(f"第 {i} 句: {segment}")
-                if len(segment) > config.max_word_count_english:
-                    logger.info(f"第 {i} 句长度超过限制,长度为: {len(segment)}\n{segment}")
+                if count_words(segment) > max_word_count_english:
+                    logger.info(f"第 {i} 句长度超过限制,长度为: {count_words(segment)}\n{segment}")
             
             # 保存结果
             # from .data import save_split_results

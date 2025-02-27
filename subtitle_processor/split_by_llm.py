@@ -37,8 +37,8 @@ def split_by_llm(text: str,
     Returns:
         List[str]: 拆分后的句子列表
     """
-    logger.info(f"text: {text}")
-
+    logger.debug(f"text: \n{text}")
+    
     # 初始化客户端
     config = SubtitleConfig()
     client = OpenAI(
@@ -68,7 +68,7 @@ def split_by_llm(text: str,
         result = response.choices[0].message.content
         if not result:
             raise Exception("API返回为空")
-        logger.info(f"API: {result}")
+        logger.debug(f"API: \n{result}")
 
         # 清理和分割文本 - 简化处理，保留原始格式
         result = re.sub(r'\n+', '', result)

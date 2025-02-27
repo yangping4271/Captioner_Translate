@@ -3,6 +3,7 @@ dotenv.load_dotenv()
 
 import argparse
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -13,6 +14,10 @@ from subtitle_processor.config import SubtitleConfig, SRT_SUFFIX, OUTPUT_SUFFIX,
 from subtitle_processor.data import load_subtitle, SubtitleData
 from utils.test_opanai import test_openai
 from utils.logger import setup_logger
+
+# 检查命令行参数中是否有-d或--debug，如果有则设置环境变量
+if '-d' in sys.argv or '--debug' in sys.argv:
+    os.environ['DEBUG'] = 'true'
 
 # 配置日志
 logger = setup_logger("subtitle_translator_cli")
@@ -42,7 +47,7 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
-            # logger.debug(f"字幕内容: {asr_data.to_txt()}")
+            logger.debug(f"字幕内容: {asr_data.to_txt()[:200]}...")  # 只显示前200个字符
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
@@ -108,10 +113,11 @@ class SubtitleTranslator:
 def main():
     parser = argparse.ArgumentParser(description="翻译字幕文件")
     parser.add_argument("input_file", help="输入的字幕文件路径")
-    parser.add_argument("-r", "--reflect", action="store_true", help="是否启用反思翻译")
-    parser.add_argument("-m", "--llm_model", help="LLM模型", default=None)
+    parser.add_argument("-r", "--reflect", action="store_true", help="启用反思翻译模式，提高翻译质量但会增加处理时间")
+    parser.add_argument("-m", "--llm_model", help="指定使用的LLM模型，默认使用配置文件中的设置")
+    parser.add_argument("-d", "--debug", action="store_true", help="启用调试日志级别，显示更详细的处理信息")
     args = parser.parse_args()
-
+    
     try:
         # 处理文件名
         base_path = Path(args.input_file)

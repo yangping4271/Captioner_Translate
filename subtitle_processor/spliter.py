@@ -308,7 +308,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             and total_words <= max_word_count \
             and ("." not in current_seg.text and "?" not in current_seg.text and "!" not in current_seg.text):
             # 执行合并操作
-            logger.info(f"合并优化: \n{current_seg.text} --- {next_seg.text} -> \n{current_seg.text + next_seg.text}") 
+            logger.info(f"合并优化: \n{current_seg.text} --- {next_seg.text} -> {current_seg.text + next_seg.text}") 
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
             current_seg.end_time = next_seg.end_time
@@ -320,18 +320,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             i += 1
 
 
-def determine_num_segments(word_count: int, threshold: int = 1000) -> int:
-    """
-    根据字数计算分段数，每1000个字为一个分段，至少为1
-    """
-    num_segments = word_count // threshold
-    # 如果存在余数，增加一个分段
-    if word_count % threshold > 0:
-        num_segments += 1
-    return max(1, num_segments)
-
-
-def preprocess_segments(segments: List[SubtitleSegment], need_lower=False) -> List[SubtitleSegment]:
+def preprocess_segments(segments: List[SubtitleSegment]) -> List[SubtitleSegment]:
     """
     预处理字幕分段:
     1. 移除纯标点符号的分段
@@ -339,7 +328,6 @@ def preprocess_segments(segments: List[SubtitleSegment], need_lower=False) -> Li
     
     Args:
         segments: 字幕分段列表
-        need_lower: 是否需要转换为小写（默认为False，保留原始大小写）
     Returns:
         处理后的分段列表
     """
@@ -420,10 +408,65 @@ def process_by_llm(segments: List[SubtitleSegment],
     return merged_segments
 
 
+def split_by_sentences(asr_data: SubtitleData, batch_size: int = 50) -> List[SubtitleData]:
+    """
+    根据句号等标点符号切分句子，并按指定批次大小分组
+    
+    Args:
+        asr_data: 字幕数据
+        batch_size: 每批次包含的句子数量，默认50
+        
+    Returns:
+        List[SubtitleData]: 按批次分组后的字幕数据列表
+    """
+    # 定义句子结束标志
+    sentence_end_markers = ['.', '!', '?', '。', '！', '？', '…']
+    
+    # 预处理字幕数据
+    segments = preprocess_segments(asr_data.segments)
+    
+    # 按句子切分
+    sentence_segments = []
+    current_sentence_segments = []
+    
+    for seg in segments:
+        current_sentence_segments.append(seg)
+        text = seg.text.strip()
+        
+        # 检查是否是句子结尾
+        if any(text.endswith(marker) for marker in sentence_end_markers):
+            if current_sentence_segments:
+                sentence_segments.append(current_sentence_segments)
+                current_sentence_segments = []
+    
+    # 处理最后一组未完成的句子
+    if current_sentence_segments:
+        sentence_segments.append(current_sentence_segments)
+    
+    # 按批次分组
+    batched_data = []
+    current_batch = []
+    current_segments = []
+    
+    for sentence in sentence_segments:
+        current_batch.append(sentence)
+        current_segments.extend(sentence)
+        
+        if len(current_batch) >= batch_size:
+            batched_data.append(SubtitleData(current_segments))
+            current_batch = []
+            current_segments = []
+    
+    # 处理最后一批未满的数据
+    if current_segments:
+        batched_data.append(SubtitleData(current_segments))
+    
+    return batched_data
+
+
 def merge_segments(asr_data: SubtitleData, 
                    model: str = "gpt-4o-mini", 
                    num_threads: int = FIXED_NUM_THREADS, 
-                   max_word_count_english: int = None,
                    save_split: str = None) -> SubtitleData:
     """
     合并字幕分段
@@ -435,19 +478,14 @@ def merge_segments(asr_data: SubtitleData,
         max_word_count_english: 英文最大单词数
         save_split: 保存断句结果的文件路径
     """
-    # 使用配置中的值
-    config = get_default_config()
-    max_word_count_english = max_word_count_english or config.max_word_count_english
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
-    asr_data.segments = preprocess_segments(asr_data.segments, need_lower=False)
-    txt = asr_data.to_txt().replace("\n", " ").strip()  # 将换行符替换为空格而不是直接删除
-    total_word_count = count_words(txt)
-
-    # 确定分段数，分割字幕数据
-    num_segments = determine_num_segments(total_word_count, threshold=SEGMENT_THRESHOLD)
-    logger.info(f"根据字数 {total_word_count}，分段字数限制{SEGMENT_THRESHOLD}, 确定分段数: {num_segments}")
-    asr_data_segments = split_asr_data(asr_data, num_segments)
+    asr_data.segments = preprocess_segments(asr_data.segments)
+    
+    # 使用新的按句子分段方法
+    batch_size = 5
+    asr_data_segments = split_by_sentences(asr_data, batch_size=batch_size)
+    logger.info(f"按句子分段，{batch_size} 个句子一个批次，共 {len(asr_data_segments)} 批次")
 
     # 多线程处理每个分段
     logger.info("开始并行处理每个分段...")

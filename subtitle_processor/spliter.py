@@ -10,7 +10,6 @@ from utils.logger import setup_logger
 
 logger = setup_logger("subtitle_spliter")
 
-SEGMENT_THRESHOLD = 500  # 每个分段的最大字数
 FIXED_NUM_THREADS = 1  # 固定的线程数量
 SPLIT_RANGE = 30  # 在分割点前后寻找最大时间间隔的范围
 MAX_GAP = 1500  # 允许每个词语之间的最大时间间隔 ms
@@ -156,130 +155,6 @@ def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences
         return segments
 
     return new_segments
-
-def split_asr_data(asr_data: SubtitleData, num_segments: int) -> List[SubtitleData]:
-    """
-    将字幕数据分割成指定数量的段，确保分段时考虑字数限制和句子完整性
-    """
-    total_segs = len(asr_data.segments)
-    total_word_count = count_words(asr_data.to_txt())
-    words_per_segment = total_word_count // num_segments
-
-    if num_segments <= 1 or total_segs <= num_segments:
-        return [asr_data]
-
-    # 获取所有段落的累计字数
-    cumulative_words = [0]
-    for i in range(total_segs):
-        words = count_words(asr_data.segments[i].text)
-        cumulative_words.append(cumulative_words[-1] + words)
-    
-    # 定义句子结束标志
-    sentence_end_markers = ['.', '!', '?', '。', '！', '？', '…']
-    
-    # 定义不应结束于此的词语
-    bad_end_words = ["and", "or", "but", "so", "yet", "for", "nor", "in", "on", "at", "to", "with", "by", "as"]
-    
-    # 计算分割点
-    split_indices = []
-    for i in range(1, num_segments):
-        target_words = i * words_per_segment
-        
-        # 找到最接近目标字数的分段索引
-        seg_index = 0
-        for j in range(total_segs):
-            if cumulative_words[j+1] >= target_words:
-                seg_index = j
-                break
-        
-        # 搜索范围：向前和向后各30个分段
-        search_range = 30
-        start_idx = max(0, seg_index - search_range)
-        end_idx = min(total_segs - 1, seg_index + search_range)
-        
-        # 寻找最佳分割点
-        best_index = seg_index
-        best_score = -1  # 分数越高越好
-        
-        for j in range(start_idx, end_idx + 1):
-            # 跳过已经选择的分割点
-            if j in split_indices:
-                continue
-                
-            # 计算与目标字数的接近程度 (负数分数，越接近0越好)
-            words_score = -abs(cumulative_words[j+1] - target_words) / 100
-            
-            # 检查是否在句子结束处 (加分)
-            ends_with_sentence = False
-            current_text = asr_data.segments[j].text.strip().lower()
-            for marker in sentence_end_markers:
-                if marker in current_text:
-                    ends_with_sentence = True
-                    break
-            
-            # 检查是否以不好的词结尾 (减分)
-            ends_with_bad_word = False
-            for word in bad_end_words:
-                if current_text.endswith(word) or current_text.endswith(word + " "):
-                    ends_with_bad_word = True
-                    break
-            
-            # 检查时间间隔 (加分)
-            time_gap = 0
-            if j < total_segs - 1:
-                time_gap = asr_data.segments[j+1].start_time - asr_data.segments[j].end_time
-            
-            # 计算总分
-            score = words_score
-            if ends_with_sentence:
-                score += 10  # 句子结束加10分
-            if ends_with_bad_word:
-                score -= 20  # 以不好的词结尾减20分
-            score += time_gap / 1000  # 时间间隔按秒加分
-            
-            # 更新最佳索引
-            if score > best_score:
-                best_score = score
-                best_index = j
-                
-            # 如果找到完美的结束点，直接使用它
-            if ends_with_sentence and not ends_with_bad_word and abs(cumulative_words[j+1] - target_words) < 100:
-                best_index = j
-                break
-        
-        # 检查所选分割点是否合适
-        current_text = asr_data.segments[best_index].text.strip().lower()
-        next_text = "" if best_index + 1 >= total_segs else asr_data.segments[best_index + 1].text.strip().lower()
-        
-        # 如果该分割点结束于不好的词或者是短语的中间，尝试向前找更好的句子结束点
-        if any(current_text.endswith(word) for word in bad_end_words):
-            # 向前搜索更好的分割点
-            for j in range(best_index - 1, start_idx - 1, -1):
-                prev_text = asr_data.segments[j].text.strip().lower()
-                if any(marker in prev_text for marker in sentence_end_markers) and not any(prev_text.endswith(word) for word in bad_end_words):
-                    best_index = j
-                    break
-        
-        split_indices.append(best_index)
-    
-    # 移除重复的分割点
-    split_indices = sorted(list(set(split_indices)))
-    
-    # 根据分割点拆分ASRData
-    segments = []
-    prev_index = 0
-    for index in split_indices:
-        part = SubtitleData(asr_data.segments[prev_index:index + 1])
-        segments.append(part)
-        prev_index = index + 1
-    
-    # 添加最后一部分
-    if prev_index < total_segs:
-        part = SubtitleData(asr_data.segments[prev_index:])
-        segments.append(part)
-    
-    return segments
-
 
 def merge_short_segment(segments: List[SubtitleSegment]) -> None:
     """
@@ -518,8 +393,6 @@ def merge_segments(asr_data: SubtitleData,
             logger.info(f"所有分段断句完成，共 {len(all_segments)} 句")
             for i, segment in enumerate(all_segments, 1):
                 logger.debug(f"第 {i} 句: {segment}")
-                if count_words(segment) > max_word_count_english:
-                    logger.info(f"第 {i} 句长度超过限制,长度为: {count_words(segment)}\n{segment}")
             
             # 保存结果
             # from .data import save_split_results

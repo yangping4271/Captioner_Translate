@@ -29,16 +29,6 @@ def is_pure_punctuation(s: str) -> bool:
 def count_words(text: str) -> int:
     """
     统计多语言文本中的字符/单词数
-    支持:
-    - 英文（按空格分词）
-    - CJK文字（中日韩统一表意文字）
-    - 韩文/谚文
-    - 泰文
-    - 阿拉伯文
-    - 俄文西里尔字母
-    - 希伯来文
-    - 越南文
-    每个字符都计为1个单位，英文按照空格分词计数
     """
     # 定义各种语言的Unicode范围
     patterns = [
@@ -166,73 +156,6 @@ def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences
         return segments
 
     return new_segments
-
-
-def split_long_segment(segs_to_merge: List[SubtitleSegment]) -> List[SubtitleSegment]:
-    """
-    基于最大时间间隔拆分长分段，根据文本类型使用不同的最大词数限制
-    """
-    result_segs = []
-    
-    # 添加空列表检查
-    if not segs_to_merge:
-        return result_segs
-        
-    # 修改合并文本的方式，添加空格
-    merged_text = ' '.join(seg.text.strip() for seg in segs_to_merge)
-
-    # 根据文本类型确定最大词数限制
-    config = get_default_config()
-    max_word_count = config.max_word_count_english
-
-    # 基本情况：如果分段足够短或无法进一步拆分
-    if count_words(merged_text) <= max_word_count or len(segs_to_merge) == 1:
-        # 保留原始文本格式，不添加额外标点符号
-        merged_seg = SubtitleSegment(
-            merged_text.strip(),
-            segs_to_merge[0].start_time,
-            segs_to_merge[-1].end_time
-        )
-        result_segs.append(merged_seg)
-        return result_segs
-
-    # 检查时间间隔是否都相等
-    n = len(segs_to_merge)
-    gaps = [segs_to_merge[i+1].start_time - segs_to_merge[i].end_time for i in range(n-1)]
-    all_equal = all(abs(gap - gaps[0]) < 1e-6 for gap in gaps)
-
-    if all_equal:
-        # 如果时间间隔都相等，在中间位置断句
-        split_index = n // 2
-    else:
-        # 在分段中间2/3部分寻找最大时间间隔点
-        start_idx = n // 6
-        end_idx = (5 * n) // 6
-        split_index = max(
-            range(start_idx, end_idx),
-            key=lambda i: segs_to_merge[i + 1].start_time - segs_to_merge[i].end_time,
-            default=n // 2
-        )
-
-    # 尝试在句子边界拆分
-    # 检查拆分点前后的文本是否有句子结束标志
-    sentence_end_markers = ['.', '!', '?', '。', '！', '？']
-    
-    # 向前搜索最近的句子结束点
-    for i in range(split_index, -1, -1):
-        if any(marker in segs_to_merge[i].text for marker in sentence_end_markers):
-            split_index = i
-            break
-    
-    first_segs = segs_to_merge[:split_index + 1]
-    second_segs = segs_to_merge[split_index + 1:]
-    
-    # 递归拆分
-    result_segs.extend(split_long_segment(first_segs))
-    result_segs.extend(split_long_segment(second_segs))
-
-    return result_segs
-
 
 def split_asr_data(asr_data: SubtitleData, num_segments: int) -> List[SubtitleData]:
     """
@@ -385,7 +308,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             and total_words <= max_word_count \
             and ("." not in current_seg.text and "?" not in current_seg.text and "!" not in current_seg.text):
             # 执行合并操作
-            logger.info(f"合并优化: {current_seg.text} --- {next_seg.text}")
+            logger.info(f"合并优化: \n{current_seg.text} --- {next_seg.text} -> \n{current_seg.text + next_seg.text}") 
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
             current_seg.end_time = next_seg.end_time

@@ -51,8 +51,9 @@ def setup_logger(name: str,
         # 文件处理器
         if log_file:
             Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=10*1024*1024, backupCount=5, encoding='utf-8'
+            # 使用FileHandler替代RotatingFileHandler，并设置mode='w'以覆盖之前的日志
+            file_handler = logging.FileHandler(
+                log_file, mode='w', encoding='utf-8'
             )
             file_handler.setLevel(level)
             file_handler.setFormatter(formatter)

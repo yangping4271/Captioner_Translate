@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 from subtitle_processor.optimizer import SubtitleOptimizer
 from subtitle_processor.summarizer import SubtitleSummarizer
 from subtitle_processor.spliter import merge_segments
-from subtitle_processor.config import SubtitleConfig, SRT_SUFFIX, OUTPUT_SUFFIX, EN_OUTPUT_SUFFIX, get_default_config
+from subtitle_processor.config import get_default_config
 from subtitle_processor.data import load_subtitle, SubtitleData
 from utils.test_opanai import test_openai
 from utils.logger import setup_logger

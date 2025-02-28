@@ -85,13 +85,10 @@ def split_by_llm(text: str,
         for sentence in sentences:
             threshold = max_word_count_english + 5
             word_count = count_words(sentence)
-            
-            if word_count > max_word_count_english:
-                if word_count < threshold:
-                    logger.debug(f"发现长句子, 长度为: {word_count}\n{sentence}\n")
-                else:
-                    logger.info(f"发现超长句子, 长度为: {word_count}\n{sentence}\n")
-                    
+            if max_word_count_english > 14 and word_count < threshold:
+                logger.info(f"长句子, 长度为: {word_count}\n\n\t{sentence}\n")
+            if word_count > threshold:
+                logger.info(f"超长句子, 长度为: {word_count}\n\n\t{sentence}\n")
                 # 尝试切分句子
                 split_results = split_by_common_words(sentence)
                 new_sentences.extend(split_results)
@@ -251,5 +248,5 @@ def split_by_common_words(text: str) -> List[str]:
     lengths = [count_words(segment) for segment in result]
     if max(lengths) > min(lengths) * 3:  # 如果最长的分段超过最短的3倍
         return [text]
-    logger.debug(f"优化分割: \t{text}:\t{'--'.join(result)}\n")
+    logger.info(f"优化分割: \n{text}:\n{' -- '.join(result)}\n")
     return result

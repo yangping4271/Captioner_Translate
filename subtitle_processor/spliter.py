@@ -183,7 +183,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             and total_words <= max_word_count \
             and ("." not in current_seg.text and "?" not in current_seg.text and "!" not in current_seg.text):
             # 执行合并操作
-            logger.info(f"合并优化: \n{current_seg.text} --- {next_seg.text}") 
+            logger.info(f"合并优化: \n\n\t{current_seg.text} --- {next_seg.text}\n") 
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
             current_seg.end_time = next_seg.end_time
@@ -360,7 +360,7 @@ def merge_segments(asr_data: SubtitleData,
     # 使用新的按句子分段方法
     batch_size = 5
     asr_data_segments = split_by_sentences(asr_data, batch_size=batch_size)
-    logger.info(f"按句子分段，{batch_size} 个句子一个批次，共 {len(asr_data_segments)} 批次")
+    logger.info(f"按{batch_size}个句子分段，共 {len(asr_data_segments)} 批次")
 
     # 多线程处理每个分段
     logger.info("开始并行处理每个分段...")

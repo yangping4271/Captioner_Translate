@@ -256,7 +256,8 @@ def merge_by_time_gaps(segments: List[SubtitleSegment], max_gap: int = MAX_GAP, 
 
 def process_by_llm(segments: List[SubtitleSegment], 
                    model: str = "gpt-4o-mini",
-                   max_word_count_english: int = None) -> List[SubtitleSegment]:
+                   max_word_count_english: int = None,
+                   batch_index: int = None) -> List[SubtitleSegment]:
     """
     使用LLM处理分段
     
@@ -264,6 +265,7 @@ def process_by_llm(segments: List[SubtitleSegment],
         segments: 字幕分段列表
         model: 使用的语言模型
         max_word_count_english: 英文最大单词数
+        batch_index: 批次编号
         
     Returns:
         List[SubtitleSegment]: 处理后的字幕分段列表
@@ -273,29 +275,35 @@ def process_by_llm(segments: List[SubtitleSegment],
         
     # 修改合并文本的方式，添加空格
     txt = " ".join([seg.text.strip() for seg in segments])
+    # 记录当前批次的单词数
+    current_words = count_words(txt)
+    logger.info(f"批次 {batch_index}: 处理文本单词数: {current_words}")
+    
     # 使用LLM拆分句子
     sentences = split_by_llm(txt, 
                            model=model, 
                            max_word_count_english=max_word_count_english)
-    logger.info(f"分段的句子提取完成，共 {len(sentences)} 句")
+    logger.info(f"批次 {batch_index}: 句子提取完成，共 {len(sentences)} 句")
     # 对当前分段进行合并处理
     merged_segments = merge_segments_based_on_sentences(segments, sentences)
     return merged_segments
 
 
-def split_by_sentences(asr_data: SubtitleData, batch_size: int = 50) -> List[SubtitleData]:
+def split_by_sentences(asr_data: SubtitleData, word_threshold: int = 500) -> List[SubtitleData]:
     """
-    根据句号等标点符号切分句子，并按指定批次大小分组
+    根据句号等标点符号切分句子，并按指定单词数阈值分组
     
     Args:
         asr_data: 字幕数据
-        batch_size: 每批次包含的句子数量，默认50
+        word_threshold: 每组最大单词数，默认500
         
     Returns:
-        List[SubtitleData]: 按批次分组后的字幕数据列表
+        List[SubtitleData]: 按单词数阈值分组后的字幕数据列表
     """
     # 定义句子结束标志
     sentence_end_markers = ['.', '!', '?', '。', '！', '？', '…']
+    # 定义分句标点
+    split_markers = [',', '，', ';', '；', '、']
     
     # 预处理字幕数据
     segments = preprocess_segments(asr_data.segments)
@@ -318,19 +326,76 @@ def split_by_sentences(asr_data: SubtitleData, batch_size: int = 50) -> List[Sub
     if current_sentence_segments:
         sentence_segments.append(current_sentence_segments)
     
-    # 按批次分组
+    # 按单词数阈值分组
     batched_data = []
     current_batch = []
     current_segments = []
+    current_word_count = 0
+    
+    def split_long_sentence(sentence_segs: List[SubtitleSegment]) -> List[List[SubtitleSegment]]:
+        """拆分过长的句子"""
+        result = []
+        temp_segs = []
+        temp_word_count = 0
+        
+        for seg in sentence_segs:
+            seg_text = seg.text.strip()
+            seg_word_count = count_words(seg_text)
+            
+            # 如果当前段落加上之前的已经超过阈值，并且当前段落以分句标点结尾
+            if (temp_word_count + seg_word_count > word_threshold and 
+                any(seg_text.endswith(marker) for marker in split_markers)):
+                if temp_segs:
+                    result.append(temp_segs)
+                    temp_segs = []
+                    temp_word_count = 0
+            
+            temp_segs.append(seg)
+            temp_word_count += seg_word_count
+            
+            # 如果累积的单词数已经接近阈值，强制分段
+            if temp_word_count >= word_threshold * 1.2:
+                if temp_segs:
+                    result.append(temp_segs)
+                    temp_segs = []
+                    temp_word_count = 0
+        
+        # 处理剩余的段落
+        if temp_segs:
+            result.append(temp_segs)
+        
+        return result
     
     for sentence in sentence_segments:
-        current_batch.append(sentence)
-        current_segments.extend(sentence)
+        # 计算当前句子的单词数
+        sentence_text = " ".join([seg.text for seg in sentence])
+        sentence_word_count = count_words(sentence_text)
         
-        if len(current_batch) >= batch_size:
+        # 如果当前句子超过阈值，尝试拆分
+        if sentence_word_count >= word_threshold:
+            # 先保存当前批次
+            if current_segments:
+                batched_data.append(SubtitleData(current_segments))
+                current_batch = []
+                current_segments = []
+                current_word_count = 0
+            
+            # 拆分长句子
+            split_parts = split_long_sentence(sentence)
+            for part in split_parts:
+                batched_data.append(SubtitleData(part))
+            continue
+            
+        # 如果添加当前句子后超过阈值，先保存当前批次，然后开始新批次
+        if current_word_count + sentence_word_count > word_threshold and current_segments:
             batched_data.append(SubtitleData(current_segments))
             current_batch = []
             current_segments = []
+            current_word_count = 0
+        
+        current_batch.append(sentence)
+        current_segments.extend(sentence)
+        current_word_count += sentence_word_count
     
     # 处理最后一批未满的数据
     if current_segments:
@@ -350,29 +415,36 @@ def merge_segments(asr_data: SubtitleData,
         asr_data: 字幕数据
         model: 使用的语言模型
         num_threads: 线程数量
-        max_word_count_english: 英文最大单词数
         save_split: 保存断句结果的文件路径
     """
 
     # 预处理字幕数据，移除纯标点符号的分段，并处理仅包含字母和撇号的文本
     asr_data.segments = preprocess_segments(asr_data.segments)
     
-    # 使用新的按句子分段方法
-    batch_size = 5
-    asr_data_segments = split_by_sentences(asr_data, batch_size=batch_size)
-    logger.info(f"按{batch_size}个句子分段，共 {len(asr_data_segments)} 批次")
+    # 使用新的按单词数分组方法
+    word_threshold = 500
+    asr_data_segments = split_by_sentences(asr_data, word_threshold=word_threshold)
+    total_segments = len(asr_data_segments)
+    logger.info(f"按每组{word_threshold}个单词分组，共 {total_segments} 批次")
+
+    # 检查每个批次的单词数
+    for i, segment in enumerate(asr_data_segments):
+        text = " ".join([seg.text.strip() for seg in segment.segments])
+        word_count = count_words(text)
+        logger.info(f"批次 {i+1}/{total_segments}: 单词数 {word_count}")
 
     # 多线程处理每个分段
     logger.info("开始并行处理每个分段...")
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        def process_segment(asr_data_part):
+        def process_segment(args):
+            index, asr_data_part = args
             try:
-                return process_by_llm(asr_data_part.segments, model=model)
+                return process_by_llm(asr_data_part.segments, model=model, batch_index=index+1)
             except Exception as e:
-                raise Exception(f"LLM处理失败: {str(e)}")
+                raise Exception(f"批次 {index+1} LLM处理失败: {str(e)}")
 
-        # 并行处理所有分段
-        processed_segments = list(executor.map(process_segment, asr_data_segments))
+        # 并行处理所有分段，添加批次编号
+        processed_segments = list(executor.map(process_segment, enumerate(asr_data_segments)))
 
     # 合并所有处理后的分段
     final_segments = []

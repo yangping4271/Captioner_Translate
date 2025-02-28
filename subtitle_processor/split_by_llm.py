@@ -94,7 +94,7 @@ def split_by_llm(text: str,
     Returns:
         List[str]: 拆分后的句子列表
     """
-    logger.debug(f"分段文本: \n\n{text}\n")
+    logger.info(f"单词数{count_words(text)}, 分段文本: \n\n\t{text[:200]}...{text[-200:]}\n")
     
     # 初始化客户端
     config = SubtitleConfig()
@@ -174,7 +174,7 @@ def split_by_llm(text: str,
             logger.warning(f"API调用失败: {str(e)}，剩余重试次数: {max_retries-1}")
             return split_by_llm(text, model, max_word_count_english, max_retries-1)
         else:
-            logger.error(f"API调用失败，无法拆分句子: {str(e)}")
+            logger.error(f"API调用失败, 无法拆分句子: {str(e)}")
             # 如果API调用失败，使用简单的句子拆分
             return text.split(". ")
         

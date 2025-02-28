@@ -85,7 +85,7 @@ def split_by_llm(text: str,
         for sentence in sentences:
             threshold = max_word_count_english + 5
             word_count = count_words(sentence)
-            if max_word_count_english > 14 and word_count < threshold:
+            if max_word_count_english <word_count < threshold:
                 logger.info(f"长句子, 长度为: {word_count}\n\n\t{sentence}\n")
             if word_count > threshold:
                 logger.info(f"超长句子, 长度为: {word_count}\n\n\t{sentence}\n")

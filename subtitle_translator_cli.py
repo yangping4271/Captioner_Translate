@@ -47,7 +47,7 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
-            logger.debug(f"字幕内容: {asr_data.to_txt()[:200]}...")  # 只显示前200个字符
+            logger.debug(f"字幕内容:\n\n{asr_data.to_txt()[:200]}...\n\n")  # 只显示前200个字符
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():

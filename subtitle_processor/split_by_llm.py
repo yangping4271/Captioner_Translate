@@ -22,6 +22,62 @@ def count_words(text: str) -> int:
     english_words = english_text.strip().split()
     return len(english_words)
 
+def split_by_end_marks(sentence: str) -> List[str]:
+    """
+    按句子结束标记（句号、感叹号等）拆分句子，只要有结束标记就分割
+    
+    Args:
+        sentence: 需要拆分的句子
+        
+    Returns:
+        List[str]: 拆分后的句子列表
+    """
+    # 定义结束标记，注意每个标记后面都加了空格
+    end_marks = [". ", "! ", "? ", "... ", "…… ", "; ", "? ", "! "]
+    positions = []
+    
+    # 查找所有结束标记的位置
+    for mark in end_marks:
+        start = 0
+        while True:
+            pos = sentence.find(mark, start)
+            if pos == -1:
+                break
+            # 确保不是小数点
+            if mark == ". " and pos > 0:
+                prev_char = sentence[pos-1]
+                if prev_char.isdigit():
+                    start = pos + 1
+                    continue
+            positions.append((pos + len(mark.strip()), mark))
+            start = pos + 1
+    
+    # 如果没有找到结束标记，返回原句子
+    if not positions:
+        return [sentence]
+    
+    # 按位置排序并执行分割
+    positions.sort()
+    segments = []
+    start = 0
+    
+    for pos, mark in positions:
+        segment = sentence[start:pos].strip()
+        if segment:  # 只要不是空字符串就添加
+            segments.append(segment)
+        start = pos
+    
+    # 添加最后一段
+    last_segment = sentence[start:].strip()
+    if last_segment:
+        segments.append(last_segment)
+    
+    # 记录日志
+    if len(segments) > 1:
+        logger.info(f"优化拆分: \n\n\t{sentence}\n {' -- '.join(segments)}\n")
+    
+    return segments if segments else [sentence]
+
 def split_by_llm(text: str,
                 model: str = "gpt-4o-mini",
                 max_word_count_english: int = 14,
@@ -83,17 +139,23 @@ def split_by_llm(text: str,
         # 验证句子长度
         new_sentences = []
         for sentence in sentences:
-            threshold = max_word_count_english + 5
-            word_count = count_words(sentence)
-            if max_word_count_english <word_count < threshold:
-                logger.info(f"长句子, 长度为: {word_count}\n\n\t{sentence}\n")
-            if word_count > threshold:
-                logger.info(f"超长句子, 长度为: {word_count}\n\n\t{sentence}\n")
-                # 尝试切分句子
-                split_results = split_by_common_words(sentence)
-                new_sentences.extend(split_results)
-            else:
-                new_sentences.append(sentence)
+            # 首先按结束标记拆分句子
+            segments = split_by_end_marks(sentence)
+            
+            # 对每个分段进行长度检查
+            for segment in segments:
+                threshold = max_word_count_english + 5
+                word_count = count_words(segment)
+                
+                if max_word_count_english < word_count < threshold:
+                    logger.info(f"长句子, 长度为: {word_count}\n\n\t{segment}\n")
+                if word_count > threshold:
+                    logger.info(f"超长句子, 长度为: {word_count}\n\n\t{segment}\n")
+                    # 尝试切分句子
+                    split_results = split_by_common_words(segment)
+                    new_sentences.extend(split_results)
+                else:
+                    new_sentences.append(segment)
         
         sentences = new_sentences
 
@@ -151,19 +213,7 @@ def split_by_common_words(text: str) -> List[str]:
         # 标点符号
         ".", ",", "!", "?", ":", ";", "...", "…",
         # 引号和括号
-        "\"", "'", "'", "'", """, """, ")", "]", "}",
-        # 常见结尾词和短语
-        "too", "indeed", "instead", "anyway", "however",
-        "therefore", "hence", "thus", "accordingly",
-        # 时间和地点结尾
-        "now", "then", "here", "there", "today", "tonight",
-        "tomorrow", "yesterday",
-        # 语气和强调
-        "really", "actually", "certainly", "definitely", "absolutely",
-        "obviously", "clearly", "precisely", "exactly",
-        # 总结和过渡
-        "finally", "lastly", "ultimately", "eventually", "altogether",
-        "overall", "generally", "basically", "essentially"
+        "\"", "'", "'", "'", "'", "'", ")", "]", "}"
     }
 
     # 预处理文本

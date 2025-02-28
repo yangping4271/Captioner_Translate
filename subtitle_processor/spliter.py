@@ -73,9 +73,9 @@ def count_words(text: str) -> int:
 
 def preprocess_text(s: str) -> str:
     """
-    通过转换为小写并规范化空格来标准化文本
+    通过规范化空格来标准化文本
     """
-    return ' '.join(s.lower().split())
+    return ' '.join(s.split())
 
 
 def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences: List[str], max_unmatched: int = 5) -> List[SubtitleSegment]:
@@ -103,8 +103,6 @@ def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences
     new_segments = []
 
     for sentence in sentences:
-        # 保留原始句子，不做任何处理
-        original_sentence = sentence
         sentence_proc = preprocess_text(sentence)
         word_count = count_words(sentence_proc)
         best_ratio = 0.0
@@ -143,13 +141,12 @@ def merge_segments_based_on_sentences(segments: List[SubtitleSegment], sentences
 
             for group in seg_groups:
                 # 直接使用LLM返回的原始句子，完全保留格式和标点
-                merged_text = original_sentence
+                merged_text = sentence_proc
                 
                 merged_start_time = group[0].start_time
                 merged_end_time = group[-1].end_time
                 merged_seg = SubtitleSegment(merged_text, merged_start_time, merged_end_time)
                 
-                # 直接添加合并后的段落，不进行额外的拆分
                 new_segments.append(merged_seg)
             
             max_shift = 30

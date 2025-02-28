@@ -37,7 +37,7 @@ def split_by_llm(text: str,
     Returns:
         List[str]: 拆分后的句子列表
     """
-    logger.debug(f"text: \n{text}")
+    logger.debug(f"分段文本: \n{text}")
     
     # 初始化客户端
     config = SubtitleConfig()
@@ -68,7 +68,7 @@ def split_by_llm(text: str,
         result = response.choices[0].message.content
         if not result:
             raise Exception("API返回为空")
-        logger.debug(f"API: \n{result}")
+        logger.debug(f"API返回结果: \n{result}")
 
         # 清理和分割文本 - 简化处理，保留原始格式
         result = re.sub(r'\n+', '', result)

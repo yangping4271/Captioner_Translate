@@ -74,7 +74,7 @@ def split_by_end_marks(sentence: str) -> List[str]:
     
     # 记录日志
     if len(segments) > 1:
-        logger.info(f"优化拆分: \n\n\t{sentence}\n {' -- '.join(segments)}\n")
+        logger.info(f"拆分优化: {' -- '.join(segments)}")
     
     return segments if segments else [sentence]
 

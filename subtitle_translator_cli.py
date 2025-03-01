@@ -47,12 +47,12 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
-            logger.debug(f"字幕内容:\n\n{asr_data.to_txt()[:200]}...\n\n")  # 只显示前200个字符
+            logger.debug(f"字幕内容: {asr_data.to_txt()[:100]}...")  # 只显示前100个字符
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
-                model = "gpt-4o-mini"
-                # model = self.config.llm_model14
+                # model = "gpt-4o-mini"
+                model = self.config.llm_model
                 logger.info(f"正在使用{model} 断句")
                 logger.info(f"句子限制长度为{self.config.max_word_count_english}字")
                 asr_data = merge_segments(asr_data, model=model, 
@@ -92,7 +92,7 @@ class SubtitleTranslator:
         """获取字幕内容摘要"""
         logger.info(f"正在使用 {self.config.llm_model} 总结字幕...")
         summarize_result = self.summarizer.summarize(asr_data.to_txt(), input_file)
-        logger.info(f"总结字幕内容:{summarize_result.get('summary')}")
+        logger.info(f"总结字幕内容:\n{summarize_result.get('summary')}\n")
         return summarize_result
 
     def _translate_subtitles(self, asr_data: SubtitleData, summarize_result: str, reflect: bool = False) -> List[Dict]:

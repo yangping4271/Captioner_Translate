@@ -183,7 +183,7 @@ def merge_short_segment(segments: List[SubtitleSegment]) -> None:
             and total_words <= max_word_count \
             and ("." not in current_seg.text and "?" not in current_seg.text and "!" not in current_seg.text):
             # 执行合并操作
-            logger.info(f"合并优化: \n\n\t{current_seg.text} --- {next_seg.text}\n") 
+            logger.info(f"合并优化: {current_seg.text[-10:]} --- {next_seg.text[:10]}") 
             # 更新当前段落的文本和结束时间
             current_seg.text += " " + next_seg.text
             current_seg.end_time = next_seg.end_time

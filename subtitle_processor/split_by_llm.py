@@ -94,7 +94,7 @@ def split_by_llm(text: str,
     Returns:
         List[str]: 拆分后的句子列表
     """
-    logger.info(f"单词数{count_words(text)}, 分段文本: \n\n\t{text[:200]}...{text[-200:]}\n")
+    logger.info(f"单词数{count_words(text)}, 分段文本: {text[:50]}...{text[-50:]}")
     
     # 初始化客户端
     config = SubtitleConfig()
@@ -148,9 +148,9 @@ def split_by_llm(text: str,
                 word_count = count_words(segment)
                 
                 if max_word_count_english < word_count < threshold:
-                    logger.info(f"长句子, 长度为: {word_count}\n\n\t{segment}\n")
+                    logger.info(f"长句: {word_count}, 文本: {segment}")
                 if word_count > threshold:
-                    logger.info(f"超长句子, 长度为: {word_count}\n\n\t{segment}\n")
+                    logger.info(f"超长句: {word_count}, 文本: {segment}")
                     # 尝试切分句子
                     split_results = split_by_common_words(segment)
                     new_sentences.extend(split_results)
@@ -298,5 +298,5 @@ def split_by_common_words(text: str) -> List[str]:
     lengths = [count_words(segment) for segment in result]
     if max(lengths) > min(lengths) * 3:  # 如果最长的分段超过最短的3倍
         return [text]
-    logger.info(f"优化分割: \n{text}:\n{' -- '.join(result)}\n")
+    logger.info(f"分割优化: {' -- '.join(result)}")
     return result

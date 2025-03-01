@@ -660,7 +660,7 @@ class SubtitleOptimizer:
                 )
                 response_content = parse_llm_response(response.choices[0].message.content)
 
-                logger.debug(f"API返回结果: {json.dumps(response_content, indent=4, ensure_ascii=False)}")
+                logger.debug(f"API返回结果: \n{json.dumps(response_content, indent=4, ensure_ascii=False)}\n")
 
                 # 如果完全没有返回结果，这是整批次的失败，需要重试
                 if not response_content:

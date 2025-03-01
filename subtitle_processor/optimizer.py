@@ -274,7 +274,7 @@ class SubtitleOptimizer:
         # 检查是否达到最大线程限制
         actual_threads = min(len(chunks), self.thread_num)
         if actual_threads < self.thread_num:
-            logger.info(f"实际使用线程数: {actual_threads}/{self.thread_num} (字幕数量较少，未达到配置的最大线程数)")
+            logger.info(f"实际使用线程数: {actual_threads}/{self.thread_num}")
         else:
             logger.info(f"实际使用线程数: {actual_threads}/{self.thread_num} (已达到配置的最大线程数)")
         

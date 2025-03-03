@@ -497,8 +497,10 @@ class SubtitleOptimizer:
                         logger.info("-" * 50)
 
             if 'revised_translation' in log:
-                logger.info(f"反思建议: {log['revise_suggestions']}")
+                logger.info(f"字幕ID: {id_num} - 翻译优化:")
+                logger.info(f"字幕: {log['optimized']}")
                 logger.info(f"翻译: {log['translation']}")
+                logger.info(f"反思建议: {log['revise_suggestions']}")
                 logger.info(f"反思后翻译: {log['revised_translation']}")
                 if i < len(sorted_ids) - 1:
                     logger.info("-" * 50)

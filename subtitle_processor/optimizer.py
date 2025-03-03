@@ -498,7 +498,7 @@ class SubtitleOptimizer:
 
             if 'revised_translation' in log:
                 logger.info(f"反思建议: {log['revise_suggestions']}")
-                logger.debug(f"翻译: {log['translation']}")
+                logger.info(f"翻译: {log['translation']}")
                 logger.info(f"反思后翻译: {log['revised_translation']}")
                 if i < len(sorted_ids) - 1:
                     logger.info("-" * 50)

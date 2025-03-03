@@ -2,9 +2,8 @@ import difflib
 import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
-
 from subtitle_processor.split_by_llm import split_by_llm
-from subtitle_processor.data import SubtitleData, SubtitleSegment
+from subtitle_processor.data import SubtitleData, SubtitleSegment, save_split_results
 from subtitle_processor.config import get_default_config
 from utils.logger import setup_logger
 
@@ -467,8 +466,7 @@ def merge_segments(asr_data: SubtitleData,
                 logger.debug(f"第 {i} 句: {segment}")
             
             # 保存结果
-            # from .data import save_split_results
-            # save_split_results(all_text, all_segments, save_split)
+            save_split_results(all_text, all_segments, save_split)
 
         except Exception as e:
             logger.error(f"保存断句结果失败: {str(e)}")

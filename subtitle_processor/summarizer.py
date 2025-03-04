@@ -54,7 +54,8 @@ class SubtitleSummarizer:
             response = self.client.chat.completions.create(
                 model=self.config.llm_model,
                 messages=message,
-                temperature=0.7
+                temperature=0.7,
+                timeout=80
             )
             
             summary = response.choices[0].message.content

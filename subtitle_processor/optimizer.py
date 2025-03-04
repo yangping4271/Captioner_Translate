@@ -382,7 +382,10 @@ class SubtitleOptimizer:
                 response = self.client.chat.completions.create(
                     model=self.config.llm_model,
                     stream=False,
-                    messages=message)
+                    messages=message,
+                    temperature=0.7,
+                    timeout=80
+                    )
                 message.pop()
                 
                 translate = response.choices[0].message.content.strip()
@@ -537,7 +540,8 @@ class SubtitleOptimizer:
                     model=self.config.llm_model,
                     stream=False,
                     messages=message,
-                    temperature=0.7
+                    temperature=0.7,
+                    timeout=80
                 )
                 response_content = parse_llm_response(response.choices[0].message.content)
                 
@@ -658,7 +662,8 @@ class SubtitleOptimizer:
                     model=self.config.llm_model,
                     stream=False,
                     messages=message,
-                    temperature=0.7
+                    temperature=0.7,
+                    timeout=80
                 )
                 response_content = parse_llm_response(response.choices[0].message.content)
 

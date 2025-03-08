@@ -15,6 +15,10 @@ from subtitle_processor.data import load_subtitle, SubtitleData
 from utils.test_opanai import test_openai
 from utils.logger import setup_logger
 
+class OpenAIAPIError(Exception):
+    """OpenAI API 相关错误"""
+    pass
+
 # 检查命令行参数中是否有-d或--debug，如果有则设置环境变量
 if '-d' in sys.argv or '--debug' in sys.argv:
     os.environ['DEBUG'] = 'true'
@@ -47,12 +51,11 @@ class SubtitleTranslator:
             
             # 加载字幕文件
             asr_data = load_subtitle(input_file)
-            logger.debug(f"字幕内容: {asr_data.to_txt()[:100]}...")  # 只显示前100个字符
+            logger.debug(f"字幕内容: {asr_data.to_txt()[:100]}...")  
             
             # 检查是否需要重新断句
             if asr_data.is_word_timestamp():
                 model = os.getenv("LLM_MODEL")
-                # model = self.config.llm_model
                 logger.info(f"正在使用{model} 断句")
                 logger.info(f"句子限制长度为{self.config.max_word_count_english}字")
                 asr_data = merge_segments(asr_data, model=model, 
@@ -72,21 +75,29 @@ class SubtitleTranslator:
                 zh_output
             )
                 
+        except OpenAIAPIError as e:
+            error_msg = f"\n{'='*50}\n错误: {str(e)}\n{'='*50}\n"
+            # 只使用logger记录错误，不重复输出
+            logger.error(error_msg)
+            sys.exit(1)
+            
         except Exception as e:
-            logger.exception(f"翻译失败: {str(e)}")
-            raise
+            error_msg = f"\n{'='*50}\n处理过程中发生错误: {str(e)}\n{'='*50}\n"
+            # 记录异常堆栈到日志
+            logger.exception(error_msg)
+            sys.exit(1)
 
     def _init_translation_env(self, llm_model: str) -> None:
         """初始化翻译环境"""
         if llm_model:
             self.config.llm_model = llm_model
-        
-        # 测试 OpenAI API
-        if not test_openai(self.config.openai_base_url, self.config.openai_api_key, self.config.llm_model):
-            raise Exception("OpenAI API 测试失败, 请检查设置")
 
         logger.info(f"使用 {self.config.openai_base_url} 作为API端点")
-        # logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
+        logger.info(f"使用 {self.config.llm_model} 作为LLM模型")
+        
+        success, error_msg = test_openai(self.config.openai_base_url, self.config.openai_api_key, self.config.llm_model)
+        if not success:
+            raise OpenAIAPIError(error_msg)
 
     def _get_subtitle_summary(self, asr_data: SubtitleData, input_file: str) -> Dict:
         """获取字幕内容摘要"""

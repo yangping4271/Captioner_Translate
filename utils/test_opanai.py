@@ -1,4 +1,6 @@
+import os
 import openai
+import ast
 
 
 def test_openai(base_url, api_key, model):
@@ -27,35 +29,33 @@ def test_openai(base_url, api_key, model):
         # 返回AI的回复
         return True, str(response.choices[0].message.content)
     except Exception as e:
-        return False, str(e)
-
-
-def get_openai_models(base_url, api_key):
-    try:
-        # 创建OpenAI客户端并获取模型列表
-        models = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=10).models.list()
-
-        # 根据不同模型设置权重进行排序
-        def get_model_weight(model_name):
-            model_name = model_name.lower()
-            if model_name.startswith(('gpt-4o', 'claude-3-5')):
-                return 10
-            elif model_name.startswith('gpt-4'):
-                return 5
-            elif model_name.startswith('claude-3'):
-                return 6
-            elif model_name.startswith(('deepseek', 'glm')):
-                return 3
-            return 0
-
-        sorted_models = sorted(
-            [model.id for model in models],
-            key=lambda x: (-get_model_weight(x), x)
-        )
-        return sorted_models
-    except Exception:
-        return []
+        error_str = str(e)
+        # 提取核心错误信息
+        try:
+            if " - " in error_str:
+                error_json = error_str.split(" - ", 1)[1]
+                try:
+                    # 尝试使用ast.literal_eval解析Python字典
+                    error_dict = ast.literal_eval(error_json)
+                    if "error" in error_dict and "message" in error_dict["error"]:
+                        return False, error_dict["error"]["message"]
+                except:
+                    # 如果ast.literal_eval失败，尝试JSON解析
+                    try:
+                        import json
+                        error_dict = json.loads(error_json)
+                        if "error" in error_dict and "message" in error_dict["error"]:
+                            return False, error_dict["error"]["message"]
+                    except:
+                        pass
+        except:
+            pass
+        return False, error_str
 
 
 if __name__ == "__main__":
-    print(test_openai("https://ddg.bkfeng.top/v1", "2", "gpt-4o-mini"))
+    base_url = os.getenv("OPENAI_BASE_URL")
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = "google/gemini-2.0-flash-lite"
+    success, msg = test_openai(base_url, api_key, model)
+    print(f"Success: {success}, Message: {msg}")

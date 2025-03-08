@@ -466,7 +466,7 @@ def merge_segments(asr_data: SubtitleData,
                 logger.debug(f"第 {i} 句: {segment}")
             
             # 保存结果
-            save_split_results(all_text, all_segments, save_split)
+            # save_split_results(all_text, all_segments, save_split)
 
         except Exception as e:
             logger.error(f"保存断句结果失败: {str(e)}")

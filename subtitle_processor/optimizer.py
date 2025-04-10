@@ -530,7 +530,7 @@ class SubtitleOptimizer:
         else:
             logger.info(f"[+]{batch_info}正在反思翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
 
-        max_retries = 3  # 最大重试次数
+        max_retries = 2  # 最大重试次数
         current_try = 0
         
         while current_try < max_retries:
@@ -590,10 +590,6 @@ class SubtitleOptimizer:
                             response_content[str(k)]["revise_suggestions"] = "翻译失败，无法提供反思建议"
                             problematic_ids.append(k)
 
-                # 如果有问题的字幕，记录下来以便后续单条翻译处理
-                if problematic_ids:
-                    logger.info(f"本批次有{len(problematic_ids)}个字幕需要后续单条翻译处理")
-
                 translated_subtitle = []
                 for k, v in response_content.items():
                     k = int(k)
@@ -652,7 +648,7 @@ class SubtitleOptimizer:
         else:
             logger.info(f"[+]{batch_info}正在翻译字幕：{subtitle_keys[0]} - {subtitle_keys[-1]} (共{len(subtitle_keys)}条)")
 
-        max_retries = 3  # 最大重试次数
+        max_retries = 2  # 最大重试次数
         current_try = 0
         
         while current_try < max_retries:
@@ -696,10 +692,6 @@ class SubtitleOptimizer:
                         logger.warning(f"字幕ID {k} 缺少translation字段，将使用默认翻译")
                         response_content[str(k)]["translation"] = f"[翻译失败] {original_subtitle[str(k)]}"
                         problematic_ids.append(k)
-
-                # 如果有问题的字幕，记录下来以便后续单条翻译处理
-                if problematic_ids:
-                    logger.info(f"本批次有{len(problematic_ids)}个字幕需要后续单条翻译处理")
 
                 translated_subtitle = []
                 for k, v in response_content.items():

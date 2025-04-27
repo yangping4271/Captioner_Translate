@@ -107,7 +107,7 @@ python subtitle_translator_cli.py input.srt -m gpt-4
 - `example_zh.srt`: 翻译后的中文字幕
 - `example.ass`: 双语字幕文件（同时显示中英文）
 
-## �� 高级功能
+## 高级功能
 
 ### 反思模式
 

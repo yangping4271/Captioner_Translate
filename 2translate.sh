@@ -39,8 +39,31 @@ fi
 
 echo "translating start..."
 
-echo 'Activating virtual environment...'
-source ~/Captioner_Translate/.venv/bin/activate
+# 检测是否使用uv
+USE_UV=false
+if command -v uv >/dev/null 2>&1 && [ -f ~/Captioner_Translate/pyproject.toml ]; then
+    USE_UV=true
+    echo "Using uv for Python execution..."
+    # 保存当前工作目录
+    CURRENT_DIR=$(pwd)
+else
+    echo "Using virtual environment for Python execution..."
+    echo 'Activating virtual environment...'
+    source ~/Captioner_Translate/.venv/bin/activate
+fi
+
+# 定义运行Python脚本的函数
+run_python() {
+    local script=$1
+    shift
+    local args="$@"
+    
+    if [ "$USE_UV" = true ]; then
+        cd ~/Captioner_Translate && uv run "$script" $args && cd - > /dev/null
+    else
+        python3 ~/Captioner_Translate/"$script" $args
+    fi
+}
 
 # 检查文件是否已翻译
 for file in $files; do
@@ -52,7 +75,11 @@ for file in $files; do
     
     # 2. 如果同时存在zh.srt和en.srt，直接生成ass
     if [ -f "./${file}_zh.srt" ] && [ -f "./${file}_en.srt" ]; then
-        python3 ~/Captioner_Translate/srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
+        if [ "$USE_UV" = true ]; then
+            run_python srt2ass.py "${CURRENT_DIR}/${file}_zh.srt" "${CURRENT_DIR}/${file}_en.srt" > /dev/null 2>&1
+        else
+            run_python srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
+        fi
         if [ -f "./${file}.ass" ]; then
             echo "INFO: ${file}.ass done."
             rm "./${file}_zh.srt" "./${file}_en.srt"
@@ -88,12 +115,20 @@ for file in $files; do
     fi
     
     # 调用翻译脚本
-    python3 ~/Captioner_Translate/subtitle_translator_cli.py "$input_file" $translator_args
+    if [ "$USE_UV" = true ]; then
+        run_python subtitle_translator_cli.py "${CURRENT_DIR}/${input_file}" $translator_args
+    else
+        run_python subtitle_translator_cli.py "$input_file" $translator_args
+    fi
     count=$((count + 1))
     
     # 生成ass字幕文件
     if [ -f "./${file}_zh.srt" ] && [ -f "./${file}_en.srt" ] && [ ! -f "./${file}.ass" ]; then
-        python3 ~/Captioner_Translate/srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
+        if [ "$USE_UV" = true ]; then
+            run_python srt2ass.py "${CURRENT_DIR}/${file}_zh.srt" "${CURRENT_DIR}/${file}_en.srt" > /dev/null 2>&1
+        else
+            run_python srt2ass.py "./${file}_zh.srt" "./${file}_en.srt" > /dev/null 2>&1
+        fi
         if [ -f "./${file}.ass" ]; then
             echo "INFO: ${file}.ass done."
             rm "./${file}_zh.srt" "./${file}_en.srt"
@@ -101,5 +136,8 @@ for file in $files; do
     fi
 done
 
-echo 'Deactivating virtual environment...'
-deactivate
+# 清理环境
+if [ "$USE_UV" = false ]; then
+    echo 'Deactivating virtual environment...'
+    deactivate
+fi

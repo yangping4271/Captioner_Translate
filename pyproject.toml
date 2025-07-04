@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.scripts]
-captioner-translate = "captioner_translate.cli:app"
+translate = "captioner_translate.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/example/captioner-translate"

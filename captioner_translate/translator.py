@@ -1,3 +1,7 @@
+"""
+Subtitle translator module - core translation functionality
+"""
+
 import dotenv
 dotenv.load_dotenv()
 

@@ -3,9 +3,8 @@ CLI interface for the Captioner Translate tool using Typer.
 """
 
 import os
-import sys
 from pathlib import Path
-from typing import List, Optional, Annotated
+from typing import Optional, Annotated
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -15,11 +14,13 @@ from .core import SubtitleTranslator, TranslationError
 
 # Initialize console and app
 console = Console()
+# Create the main app without subcommands
 app = typer.Typer(
-    name="captioner-translate",
-    help="A subtitle translation tool using OpenAI API",
+    name="translate",
+    help="Translate all subtitle files (.srt) in the current working directory",
     rich_markup_mode="rich",
     add_completion=False,
+    no_args_is_help=False,
 )
 
 # Version callback
@@ -30,97 +31,63 @@ def version_callback(value: bool):
         raise typer.Exit()
 
 
-@app.callback()
+@app.command()
 def main(
-    version: Annotated[
-        Optional[bool], 
+    reflect: Annotated[
+        bool,
+        typer.Option("-r", "--reflect", help="Enable reflection translation mode for higher quality")
+    ] = False,
+    llm_model: Annotated[
+        Optional[str],
+        typer.Option("-m", "--model", help="Specify the LLM model to use")
+    ] = None,
+    debug: Annotated[
+        bool,
+        typer.Option("-d", "--debug", help="Enable debug logging for detailed processing information")
+    ] = False,
+    project_root: Annotated[
+        Optional[Path],
+        typer.Option("--project-root", help="Path to Captioner_Translate project root")
+    ] = None,
+    show_version: Annotated[
+        Optional[bool],
         typer.Option("--version", "-v", callback=version_callback, help="Show version and exit")
     ] = None,
 ):
     """
-    Captioner Translate - A subtitle translation tool using OpenAI API
-    
-    This tool converts subtitle files (.srt) to bilingual ASS format with Chinese and English subtitles.
-    It automatically discovers subtitle files in the current directory and processes them using OpenAI's API.
-    """
-    pass
+    Translate all subtitle files (.srt) in the current working directory.
 
+    This command automatically scans the current working directory for all subtitle
+    files (.srt), translates them using OpenAI API, and generates bilingual ASS files
+    with both English and Chinese subtitles.
 
-@app.command()
-def translate(
-    directory: Annotated[
-        Optional[Path], 
-        typer.Argument(help="Directory containing subtitle files (default: current directory)")
-    ] = None,
-    max_count: Annotated[
-        int, 
-        typer.Option("-n", "--max-count", help="Maximum number of files to process (-1 for unlimited)")
-    ] = -1,
-    reflect: Annotated[
-        bool, 
-        typer.Option("-r", "--reflect", help="Enable reflection translation mode for higher quality")
-    ] = False,
-    llm_model: Annotated[
-        Optional[str], 
-        typer.Option("-m", "--model", help="Specify the LLM model to use")
-    ] = None,
-    debug: Annotated[
-        bool, 
-        typer.Option("-d", "--debug", help="Enable debug logging for detailed processing information")
-    ] = False,
-    project_root: Annotated[
-        Optional[Path], 
-        typer.Option("--project-root", help="Path to Captioner_Translate project root")
-    ] = None,
-):
-    """
-    Translate subtitle files in a directory.
-    
-    This command discovers all subtitle files (.srt) in the specified directory,
-    translates them using OpenAI API, and generates bilingual ASS files.
-    
     The tool handles various file naming patterns:
     - file.srt -> file_en.srt + file_zh.srt -> file.ass
     - file_en.srt -> file_zh.srt -> file.ass
-    - Skips files that already have .ass output
-    
+    - Skips files that already have corresponding .ass output
+
     Examples:
-    
-        # Translate all files in current directory
-        captioner-translate translate
-        
-        # Translate maximum 5 files with reflection mode
-        captioner-translate translate -n 5 -r
-        
+
+        # Translate all subtitle files in current directory
+        uv run translate
+
+        # Use reflection mode for higher quality
+        uv run translate -r
+
         # Use specific model and enable debug
-        captioner-translate translate -m gpt-4 -d
-        
-        # Translate files in specific directory
-        captioner-translate translate /path/to/subtitles
+        uv run translate -m gpt-4 -d
+
+        # Translate with all options
+        uv run translate -r -m gpt-4o -d
     """
     
     # Set debug environment variable if requested
     if debug:
         os.environ['DEBUG'] = 'true'
-    
-    # Use current directory if none specified
-    if directory is None:
-        directory = Path.cwd()
-    
-    # Validate directory
-    if not directory.exists():
-        console.print(f"[red]Error: Directory not found: {directory}[/red]")
-        raise typer.Exit(1)
-    
-    if not directory.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {directory}[/red]")
-        raise typer.Exit(1)
-    
-    # Validate max_count
-    if max_count < -1 or max_count == 0:
-        console.print("[red]Error: -n parameter must be a positive integer or -1 for unlimited[/red]")
-        raise typer.Exit(1)
-    
+
+    # Use current working directory
+    directory = Path.cwd()
+
     # Build translator arguments
     translator_args = []
     if reflect:
@@ -129,30 +96,53 @@ def translate(
         translator_args.extend(["-m", llm_model])
     if debug:
         translator_args.extend(["-d", "--debug"])
-    
+
     try:
         # Initialize translator
         translator = SubtitleTranslator(project_root=project_root)
-        
+
+        # Discover subtitle files in current directory
+        files = translator.discover_files(directory)
+
+        if not files:
+            console.print(Panel(
+                f"No subtitle files (.srt) found in current directory: {directory}",
+                title="No Files Found",
+                border_style="yellow"
+            ))
+            console.print("\n[yellow]Make sure you're in a directory containing .srt subtitle files.[/yellow]")
+            return
+
         # Show startup information
         startup_info = Text()
         startup_info.append("🎬 Captioner Translate\n", style="bold blue")
         startup_info.append(f"📁 Directory: {directory}\n", style="cyan")
-        if max_count != -1:
-            startup_info.append(f"🔢 Max files: {max_count}\n", style="yellow")
+        startup_info.append(f"📄 Files found: {len(files)}\n", style="cyan")
         if reflect:
             startup_info.append("🔄 Reflection mode: enabled\n", style="green")
         if llm_model:
             startup_info.append(f"🤖 Model: {llm_model}\n", style="magenta")
         if debug:
             startup_info.append("🐛 Debug mode: enabled\n", style="red")
-        
+
         console.print(Panel(startup_info, title="Configuration", border_style="blue"))
-        
-        # Perform translation
+
+        # Show discovered files
+        console.print(f"\n[bold blue]Found {len(files)} subtitle files:[/bold blue]")
+        for file_base in files:
+            should_skip, reason = translator.should_skip_file(file_base, directory)
+            if should_skip:
+                console.print(f"  [yellow]⏭️  {file_base}[/yellow] - {reason}")
+            elif reason == "ready_for_ass_generation":
+                console.print(f"  [green]🎬 {file_base}[/green] - ready for ASS generation")
+            else:
+                console.print(f"  [blue]📝 {file_base}[/blue] - needs translation")
+        console.print()
+
+        # Process all files
         processed_count = translator.translate_directory(
             directory=directory,
-            max_count=max_count,
+            max_count=-1,  # Process all files
             translator_args=translator_args
         )
         
@@ -184,78 +174,7 @@ def translate(
         raise typer.Exit(1)
 
 
-@app.command()
-def discover(
-    directory: Annotated[
-        Optional[Path], 
-        typer.Argument(help="Directory to search for subtitle files (default: current directory)")
-    ] = None,
-):
-    """
-    Discover and list subtitle files that would be processed.
-    
-    This command shows which subtitle files would be processed by the translate command
-    without actually performing any translation. Useful for previewing what files
-    will be affected.
-    
-    Examples:
-    
-        # Discover files in current directory
-        captioner-translate discover
-        
-        # Discover files in specific directory
-        captioner-translate discover /path/to/subtitles
-    """
-    
-    # Use current directory if none specified
-    if directory is None:
-        directory = Path.cwd()
-    
-    # Validate directory
-    if not directory.exists():
-        console.print(f"[red]Error: Directory not found: {directory}[/red]")
-        raise typer.Exit(1)
-    
-    if not directory.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {directory}[/red]")
-        raise typer.Exit(1)
-    
-    try:
-        # Initialize translator
-        translator = SubtitleTranslator()
-        
-        # Discover files
-        files = translator.discover_files(directory)
-        
-        if not files:
-            console.print(Panel(
-                "No subtitle files found to process",
-                title="Discovery Results",
-                border_style="yellow"
-            ))
-            return
-        
-        # Show discovered files with their status
-        console.print(f"\n[bold blue]Found {len(files)} subtitle files in {directory}:[/bold blue]\n")
-        
-        for file_base in files:
-            should_skip, reason = translator.should_skip_file(file_base, directory)
-            
-            if should_skip:
-                console.print(f"  [yellow]⏭️  {file_base}[/yellow] - {reason}")
-            elif reason == "ready_for_ass_generation":
-                console.print(f"  [green]🎬 {file_base}[/green] - ready for ASS generation")
-            else:
-                console.print(f"  [blue]📝 {file_base}[/blue] - needs translation")
-        
-        console.print()
-        
-    except TranslationError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
-    except Exception as e:
-        console.print(f"[red]Unexpected error: {e}[/red]")
-        raise typer.Exit(1)
+
 
 
 if __name__ == "__main__":

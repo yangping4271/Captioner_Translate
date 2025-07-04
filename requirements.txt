@@ -1,4 +1,0 @@
-﻿openai
-retry
-python-dotenv
-requests

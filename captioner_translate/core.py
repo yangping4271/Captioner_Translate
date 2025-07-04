@@ -50,7 +50,7 @@ class SubtitleTranslator:
         # Then try current directory and parents
         current = Path.cwd()
         while current != current.parent:
-            if (current / "pyproject.toml").exists() and (current / "subtitle_translator_cli.py").exists():
+            if (current / "pyproject.toml").exists() and (current / "captioner_translate").exists():
                 return current
             current = current.parent
         
@@ -224,7 +224,7 @@ class SubtitleTranslator:
             True if successful, False otherwise
         """
         args = [str(input_file)] + translator_args
-        return self.run_python_script("subtitle_translator_cli.py", args)
+        return self.run_python_script("captioner_translate/translator.py", args)
     
     def generate_ass_file(self, base_name: str, directory: Path) -> bool:
         """
@@ -251,7 +251,7 @@ class SubtitleTranslator:
         else:
             args = [str(zh_file), str(en_file)]
         
-        success = self.run_python_script("srt2ass.py", args, cwd=directory)
+        success = self.run_python_script("utils/srt2ass.py", args, cwd=directory)
         
         if success and ass_file.exists():
             console.print(f"[green]INFO: {base_name}.ass done.[/green]")
@@ -357,3 +357,86 @@ class SubtitleTranslator:
 
         console.print(f"[green]Translation completed. Processed {processed_count} files.[/green]")
         return processed_count
+
+    def translate_single_file(self, file_path: Path, translator_args: Optional[List[str]] = None) -> int:
+        """
+        Translate a single subtitle file
+
+        Args:
+            file_path: Path to the subtitle file
+            translator_args: Additional arguments for the translator
+
+        Returns:
+            Number of files processed (0 or 1)
+        """
+        if translator_args is None:
+            translator_args = []
+
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise TranslationError(f"File not found: {file_path}")
+
+        if not file_path.suffix.lower() == '.srt':
+            raise TranslationError(f"File must be a .srt subtitle file: {file_path}")
+
+        directory = file_path.parent
+        base_name = file_path.stem
+
+        # Remove _en or _zh suffix if present
+        if base_name.endswith('_en'):
+            base_name = base_name[:-3]
+        elif base_name.endswith('_zh'):
+            base_name = base_name[:-3]
+
+        console.print("[blue]Translation starting...[/blue]")
+
+        if self.use_uv:
+            console.print("[green]Using uv for Python execution...[/green]")
+        else:
+            console.print("[green]Using virtual environment for Python execution...[/green]")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+
+            task = progress.add_task(f"Processing {base_name}...", total=None)
+
+            # Check if file should be skipped
+            should_skip, reason = self.should_skip_file(base_name, directory)
+
+            if should_skip:
+                console.print(f"[yellow]INFO: {reason}[/yellow]")
+                progress.remove_task(task)
+                return 0
+
+            # Handle case where both zh and en exist - generate ass directly
+            if reason == "ready_for_ass_generation":
+                progress.update(task, description=f"Generating ASS for {base_name}...")
+                self.generate_ass_file(base_name, directory)
+                progress.remove_task(task)
+                return 1
+
+            # Perform translation
+            progress.update(task, description=f"Translating {base_name}...")
+            console.print(f"\n[bold blue]=================== Translating {base_name} ===================[/bold blue]\n")
+
+            success = self.translate_file(file_path, translator_args)
+            if not success:
+                console.print(f"[red]Failed to translate {base_name}[/red]")
+                progress.remove_task(task)
+                return 0
+
+            # Generate ASS file if both zh and en now exist
+            progress.update(task, description=f"Generating ASS for {base_name}...")
+            zh_file = directory / f"{base_name}_zh.srt"
+            en_file = directory / f"{base_name}_en.srt"
+
+            if zh_file.exists() and en_file.exists():
+                self.generate_ass_file(base_name, directory)
+
+            progress.remove_task(task)
+
+        console.print(f"[green]Translation completed. Processed 1 file.[/green]")
+        return 1

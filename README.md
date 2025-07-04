@@ -1,85 +1,195 @@
-# Captioner_Translate
+# Captioner Translate
 
-基于 OpenAI API 的智能字幕翻译工具，支持英文字幕翻译成中文，并生成双语字幕。
+An intelligent subtitle translation tool powered by OpenAI API that translates English subtitles to Chinese and generates bilingual subtitle files.
 
-## ✨ 特性
+> **📖 [中文文档 (Chinese Documentation)](README_zh.md)** | **English** (Current)
 
-- 🎯 **智能字幕处理**：支持 SRT 格式，自动生成双语 ASS 字幕
-- 🔄 **高质量翻译**：上下文感知翻译，支持反思模式提升准确性
-- 🚀 **高效处理**：多线程并行处理，支持批量翻译
+## ✨ Features
 
-## 🚀 快速开始
+- 🎯 **Smart Subtitle Processing**: Supports SRT format, automatically generates bilingual ASS subtitles
+- 🔄 **High-Quality Translation**: Context-aware translation with reflection mode for enhanced accuracy
+- 🚀 **Efficient Processing**: Multi-threaded parallel processing with batch translation support
+- 🌐 **Multiple API Support**: Compatible with OpenAI, OpenRouter, and other OpenAI-compatible APIs
+- 📝 **Professional Output**: Generates properly formatted bilingual ASS files for video players
 
-### 安装
+## 🚀 Quick Start
 
-**推荐使用 uv：**
+### Prerequisites
+
+- Python 3.9 or higher
+- OpenAI API key or compatible API service
+
+### Installation
+
 ```bash
-# 安装 uv
+# Install uv if you haven't already
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 克隆并设置项目
+# Clone the project
 git clone https://github.com/yangping4271/Captioner_Translate.git
 cd Captioner_Translate
-uv sync
+
+# Install as a global tool
+uv tool install .
 ```
 
-**传统方式：**
+### Configuration
+
+Create a `.env` file in the project root with your API configuration:
+
 ```bash
-git clone https://github.com/yangping4271/Captioner_Translate.git
-cd Captioner_Translate
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 配置
-
-创建 `.env` 文件：
-```env
-OPENAI_API_KEY=your_api_key
-OPENAI_BASE_URL=your_api_base_url
+# OpenAI API Configuration
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
+
+# Alternative: OpenRouter Configuration
+# OPENAI_API_KEY=sk-or-v1-your_openrouter_key
+# OPENAI_BASE_URL=https://openrouter.ai/api/v1
+# LLM_MODEL=openai/gpt-4o-mini
 ```
 
-## 📖 使用方法
+### Basic Usage
 
-### 基本使用
+After installation, you can use the `translate` command globally from any directory:
+
 ```bash
-# 使用 uv（推荐）
-uv run python subtitle_translator_cli.py input.srt
+# View help
+translate --help
 
-# 传统方式
-python subtitle_translator_cli.py input.srt
+# Navigate to a directory containing .srt files, then translate
+cd /path/to/your/subtitle/files
+translate
+
+# Use reflection mode for higher quality
+translate -r
+
+# Use specific model
+translate -m gpt-4
+
+# Enable debug mode
+translate -d
+
+# Combine all options
+translate -r -m gpt-4o -d
 ```
 
-### 高质量翻译（反思模式）
+## 📁 File Processing Workflow
+
+The tool automatically scans the current working directory and processes all `.srt` files:
+
+1. **Discovery**: Scans current directory for `.srt` subtitle files
+2. **Processing**:
+   - Generates `_en.srt` (optimized English subtitles)
+   - Generates `_zh.srt` (Chinese translations)
+3. **Output**: Bilingual `.ass` subtitle files
+4. **Cleanup**: Automatically removes intermediate files
+
+### Supported File Patterns
+
+- `filename.srt` → `filename_en.srt` + `filename_zh.srt` → `filename.ass`
+- `filename_en.srt` → `filename_zh.srt` → `filename.ass`
+- Files with existing `.ass` output are automatically skipped
+
+### Usage Workflow
+
+1. Install the tool globally using `uv tool install .`
+2. Navigate to any directory containing your subtitle files
+3. Run `translate`
+4. The tool will automatically find and process all `.srt` files
+5. Bilingual `.ass` files will be generated in the same directory
+
+## 🔧 Command Reference
+
+### Main Command
+
+- `translate`: Translate all subtitle files in the current working directory (available globally after installation)
+
+### Options
+
+- `-r, --reflect`: Enable reflection translation mode for higher quality
+- `-m, --model TEXT`: Specify the LLM model to use
+- `-d, --debug`: Enable debug logging for detailed processing information
+- `--project-root PATH`: Path to Captioner_Translate project root
+- `--version, -v`: Show version and exit
+
+### Examples
+
 ```bash
-uv run python subtitle_translator_cli.py input.srt -r
+# Basic translation of all .srt files in current directory
+translate
+
+# Use reflection mode for higher quality translation
+translate -r
+
+# Use specific model (GPT-4)
+translate -m gpt-4
+
+# Enable debug output
+translate -d
+
+# Combine all options
+translate -r -m gpt-4o -d
 ```
 
-### 批量处理
+## 🏗️ Project Structure
+
+```
+captioner_translate/
+├── captioner_translate/          # Main CLI package
+│   ├── __init__.py
+│   ├── cli.py                   # Typer-based CLI interface
+│   ├── core.py                  # Core translation logic
+│   └── translator.py            # Translation module
+├── subtitle_processor/          # Subtitle processing modules
+│   ├── __init__.py
+│   ├── config.py               # Configuration management
+│   ├── data.py                 # Data structures
+│   ├── optimizer.py            # Translation optimization
+│   ├── prompts.py              # AI prompts
+│   ├── split_by_llm.py         # LLM-based text splitting
+│   ├── spliter.py              # Subtitle splitting
+│   └── summarizer.py           # Content summarization
+├── utils/                      # Utility modules
+│   ├── __init__.py
+│   ├── json_repair.py          # JSON parsing utilities
+│   ├── logger.py               # Logging configuration
+│   ├── srt2ass.py              # SRT to ASS converter
+│   └── test_opanai.py          # API testing utilities
+├── test_subtitles/             # Sample subtitle files
+├── logs/                       # Application logs
+├── .env                        # Environment configuration
+├── pyproject.toml              # Project configuration
+└── README.md                   # This file
+```
+
+## 🌐 API Compatibility
+
+This tool is compatible with various OpenAI-compatible APIs:
+
+- **OpenAI**: Official OpenAI API
+- **OpenRouter**: Access to multiple models through one API
+- **Custom Endpoints**: Any OpenAI-compatible API service
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+- **API Key Issues**: Ensure your `.env` file is properly configured and the API key is valid
+- **Model Not Found**: Check that the specified model is available through your API provider
+
+### Debug Mode
+
+Enable debug mode for detailed logging:
 ```bash
-./2translate.sh
+translate -d
 ```
 
-### 生成双语字幕
-```bash
-uv run python srt2ass.py video_zh.srt video_en.srt
-```
+## 📄 License
 
-## 📁 输出文件
+MIT License - see [LICENSE](LICENSE) file for details.
 
-- `example_en.srt`: 优化后的英文字幕
-- `example_zh.srt`: 翻译后的中文字幕  
-- `example.ass`: 双语字幕文件
+## 🤝 Contributing
 
-## ⚙️ 配置选项
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-在 `subtitle_processor/config.py` 中可调整：
-- `target_language`: 目标语言（默认：简体中文）
-- `thread_num`: 并行线程数（默认：18）
-- `batch_size`: 批处理大小（默认：20）
-
-## �� 许可证
-
-MIT License

@@ -54,24 +54,12 @@ LLM_MODEL=gpt-4o-mini
 After installation, you can use the `translate` command globally from any directory:
 
 ```bash
-# View help
-translate --help
-
 # Navigate to a directory containing .srt files, then translate
 cd /path/to/your/subtitle/files
 translate
 
-# Use reflection mode for higher quality
-translate -r
-
-# Use specific model
-translate -m gpt-4
-
-# Enable debug mode
-translate -d
-
-# Combine all options
-translate -r -m gpt-4o -d
+# View all available options
+translate --help
 ```
 
 ## 📁 File Processing Workflow
@@ -91,14 +79,6 @@ The tool automatically scans the current working directory and processes all `.s
 - `filename_en.srt` → `filename_zh.srt` → `filename.ass`
 - Files with existing `.ass` output are automatically skipped
 
-### Usage Workflow
-
-1. Install the tool globally using `uv tool install .`
-2. Navigate to any directory containing your subtitle files
-3. Run `translate`
-4. The tool will automatically find and process all `.srt` files
-5. Bilingual `.ass` files will be generated in the same directory
-
 ## 🔧 Command Reference
 
 ### Main Command
@@ -113,7 +93,7 @@ The tool automatically scans the current working directory and processes all `.s
 - `--project-root PATH`: Path to Captioner_Translate project root
 - `--version, -v`: Show version and exit
 
-### Examples
+### Usage Examples
 
 ```bash
 # Basic translation of all .srt files in current directory
@@ -128,7 +108,7 @@ translate -m gpt-4
 # Enable debug output
 translate -d
 
-# Combine all options
+# Combine all options for maximum quality
 translate -r -m gpt-4o -d
 ```
 
